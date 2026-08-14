@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: CellServiceLoad
+server:
+  port: 8085
+
+cell-service:
+  url: localhost:8080
