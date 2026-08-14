@@ -1,63 +1,91 @@
 package org.slobben.cellserviceload.traffic;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
+import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadLocalRandom;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slobben.cellserviceload.adapter.rest.ServiceApiWrapper;
 import org.slobben.cellserviceload.adapter.rest.Settings;
 import org.slobben.cellserviceload.adapter.websocket.WebSocketClientConnection;
-import org.slobben.cellserviceload.utils.BlockUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.web.socket.messaging.WebSocketStompClient;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class LoadScheduler {
-  private static final int MAX_CLIENTS = 350;
-  private static final int CLIENT_GROWTH_RATE_MS = 200;
+  private static final int MAX_CLIENTS = 1500;
+  private static final int MAX_IN_FLIGHT_CONNECTS = 16;
+  private static final int MAX_STARTS_PER_TICK = 4;
+  private static final int INITIAL_VIEW_SIDE = 3;
 
-  private final List<Client> clientList = new ArrayList<>();
-
+  private final ClientRegistry clientRegistry;
   private final ServiceApiWrapper serviceApiWrapper;
+  private final WebSocketStompClient webSocketStompClient;
+  private final Executor virtualThreadExecutor;
+
   @Value("${cell-service.url}")
   private String url;
 
-  @Scheduled(fixedDelay = CLIENT_GROWTH_RATE_MS)
-  public void addClient() throws ExecutionException, InterruptedException, TimeoutException {
-    log.info("current amount of clients: {}", clientList.size()) ;
-    if (clientList.size() > MAX_CLIENTS) {
+  private final Semaphore inFlight = new Semaphore(MAX_IN_FLIGHT_CONNECTS);
+
+  @Scheduled(fixedDelay = 200)
+  public void rampUp() {
+    int current = clientRegistry.size();
+    log.info("current amount of clients: {}", current);
+    if (current >= MAX_CLIENTS) {
       return;
     }
-    Settings settings = serviceApiWrapper.getNewClient();
-
-    WebSocketClientConnection webSocketClientConnection = new WebSocketClientConnection(settings.clientId(), url);
-
-    final int initBlockX = settings.chaosHit().worldX() / settings.blockSize();
-    final int initBlockY = settings.chaosHit().worldY() / settings.blockSize();
-    int blockX = initBlockX;
-    int blockY = initBlockY;
-
-    int xLength = 2;
-    String[] initialBlocksToAdd = new String[9];
-    for (int i = 0; i < initialBlocksToAdd.length; i++) {
-      if (i % xLength == 0) {
-        blockX = initBlockX;
-        blockY++;
+    for (int i = 0; i < MAX_STARTS_PER_TICK; i++) {
+      if (!inFlight.tryAcquire()) {
+        return;
       }
-      initialBlocksToAdd[i] = BlockUtils.getKey(blockX, blockY);
-      blockX++;
+      virtualThreadExecutor.execute(this::createClient);
     }
+  }
 
-    Client client = new Client(settings.clientId(), Arrays.asList(initialBlocksToAdd), webSocketClientConnection);
-    client.webSocketClientConnection().sendClientUpdateRequest(null, initialBlocksToAdd);
+  private void createClient() {
+    try {
+      Settings settings = serviceApiWrapper.getNewClient();
+      int anchorX = settings.chaosHit().worldX() / settings.blockSize();
+      int anchorY = settings.chaosHit().worldY() / settings.blockSize();
+      Set<String> initialBlocks = ViewportMover.computeView(anchorX, anchorY, INITIAL_VIEW_SIDE);
+      String[] blocksToAdd = initialBlocks.toArray(new String[0]);
 
-    clientList.add(client);
+      WebSocketClientConnection.connect(webSocketStompClient, settings.clientId(), url)
+          .whenComplete(
+              (connection, error) -> {
+                try {
+                  if (error != null) {
+                    log.warn("connect failed for {}: {}", settings.clientId(), error.toString());
+                    return;
+                  }
+                  connection.sendClientUpdateRequest(null, blocksToAdd);
+                  Client client =
+                      new Client(
+                          settings.clientId(),
+                          anchorX,
+                          anchorY,
+                          INITIAL_VIEW_SIDE,
+                          initialBlocks,
+                          connection);
+                  long now = System.currentTimeMillis();
+                  ThreadLocalRandom rng = ThreadLocalRandom.current();
+                  client.setNextMoveAtMs(now + rng.nextInt(3_000));
+                  client.setNextRefreshAtMs(now + rng.nextInt((int) SettingsRefresher.REFRESH_INTERVAL_MS));
+                  clientRegistry.add(client);
+                } finally {
+                  inFlight.release();
+                }
+              });
+    } catch (RuntimeException e) {
+      inFlight.release();
+      log.warn("client creation failed: {}", e.toString());
+    }
   }
 }
