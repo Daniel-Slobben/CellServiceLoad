@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slobben.cellserviceload.adapter.rest.ServiceApiWrapper;
 import org.slobben.cellserviceload.adapter.rest.Settings;
-import org.slobben.cellserviceload.adapter.websocket.TopicListener;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -19,8 +18,6 @@ import org.springframework.stereotype.Component;
 public class LoadScheduler {
   private static final int MAX_IN_FLIGHT_CONNECTS = 16;
   private static final int MAX_STARTS_PER_TICK = 4;
-  private static final int RECORDING_CLIENTS = 100;
-  private static final int RECORDING_SAMPLE_EVERY = 20;
 
   private final ClientRegistry clientRegistry;
   private final ServiceApiWrapper serviceApiWrapper;
@@ -52,10 +49,7 @@ public class LoadScheduler {
 
   private void createClient() {
     try {
-      Settings settings = serviceApiWrapper.getSettings();
-      boolean record =
-          clientRegistry.size() % RECORDING_SAMPLE_EVERY == 0
-              && trafficStats.tryAcquireRecordingSlot(RECORDING_CLIENTS);
+      Settings settings = trafficStats.getSettingsLatency().time(serviceApiWrapper::getSettings);
       ThreadLocalRandom rng = ThreadLocalRandom.current();
       Device device = rng.nextDouble() < phoneShare ? Device.PHONE : Device.DESKTOP;
       Client client =
@@ -63,7 +57,7 @@ public class LoadScheduler {
               settings.clientId(),
               new Camera(device, settings.blockSize()),
               rng.nextDouble() < zoomedOutShare,
-              record ? trafficStats : TopicListener.NONE);
+              trafficStats);
       client.centerOn(settings.viewport().x(), settings.viewport().y());
 
       sessionKeeper
@@ -72,6 +66,7 @@ public class LoadScheduler {
               (connection, error) -> {
                 try {
                   if (error != null) {
+                    trafficStats.count(TrafficStats.Counter.CONNECT_FAILURES);
                     log.warn("connect failed for {}: {}", client.getId(), error.toString());
                     return;
                   }
@@ -86,6 +81,7 @@ public class LoadScheduler {
               });
     } catch (RuntimeException e) {
       inFlight.release();
+      trafficStats.count(TrafficStats.Counter.CONNECT_FAILURES);
       log.warn("client creation failed: {}", e.toString());
     }
   }

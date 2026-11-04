@@ -24,7 +24,7 @@ import org.springframework.web.socket.messaging.WebSocketStompClient;
 public class SessionKeeper {
   static final long HEALTH_CHECK_INTERVAL_MS = 8_000;
   // Ticks come every 500 ms, so a short silence means the session is gone.
-  private static final long RECONNECT_THRESHOLD_MS = 1_500;
+  static final long RECONNECT_THRESHOLD_MS = 1_500;
   private static final long CONNECT_TIMEOUT_MS = 10_000;
 
   private final ClientRegistry clientRegistry;
@@ -57,6 +57,7 @@ public class SessionKeeper {
         continue;
       }
       client.setNextHealthCheckAtMs(now + HEALTH_CHECK_INTERVAL_MS);
+      client.setHealthCheckSentAtMs(now);
       client.getConnection().sendHealthCheck();
     }
   }
@@ -77,8 +78,9 @@ public class SessionKeeper {
   private void reconnect(Client client) {
     client.getLock().lock();
     try {
+      String[] visibleBlocks = client.getBlocksInView().toArray(new String[0]);
       ReconnectResponse response =
-          serviceApiWrapper.reconnect(client.getBlocksInView().toArray(new String[0]));
+          trafficStats.getReconnectLatency().time(() -> serviceApiWrapper.reconnect(visibleBlocks));
       client.getConnection().disconnect();
       if (response.viewport() != null) {
         client.centerOn(response.viewport().x(), response.viewport().y());
@@ -86,10 +88,10 @@ public class SessionKeeper {
       // Set before subscribing, so the old topic's last messages are ignored.
       client.setId(response.clientId());
       start(client, connect(client).get(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS));
-      trafficStats.recordReconnect();
+      trafficStats.count(TrafficStats.Counter.RECONNECTS);
     } catch (Exception e) {
       // The watchdog tries again on its next tick, like the frontend.
-      trafficStats.recordReconnectFailure();
+      trafficStats.count(TrafficStats.Counter.RECONNECT_FAILURES);
       log.debug("reconnect failed for {}: {}", client.getId(), e.toString());
     } finally {
       client.setReconnecting(false);

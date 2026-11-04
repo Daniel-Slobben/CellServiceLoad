@@ -45,6 +45,7 @@ public class ViewportMover {
   private final ClientRegistry clientRegistry;
   private final ServiceApiWrapper serviceApiWrapper;
   private final Executor virtualThreadExecutor;
+  private final TrafficStats trafficStats;
 
   @Scheduled(fixedDelay = TICK_MS)
   public void tick() {
@@ -113,7 +114,7 @@ public class ViewportMover {
       client.setActionEndsAtMs(now + ZOOM_MAX_MS);
     } else {
       // The previous/next button: the frontend centres on a fresh interesting viewport.
-      Coordinates viewport = serviceApiWrapper.getViewport();
+      Coordinates viewport = trafficStats.getViewportLatency().time(serviceApiWrapper::getViewport);
       client.getCamera().centerOn(viewport.x(), viewport.y());
       idle(client, now);
     }
