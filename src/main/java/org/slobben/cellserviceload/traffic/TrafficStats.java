@@ -17,6 +17,8 @@ public class TrafficStats implements TopicListener {
   private final AtomicLong borderBlocks = new AtomicLong();
   private final AtomicLong healthAcks = new AtomicLong();
   private final AtomicLong sessionsDead = new AtomicLong();
+  private final AtomicLong reconnects = new AtomicLong();
+  private final AtomicLong reconnectFailures = new AtomicLong();
 
   @Override
   public void onBlocks(BlockFrame frame) {
@@ -32,6 +34,14 @@ public class TrafficStats implements TopicListener {
       case HEALTH_ACK -> healthAcks.incrementAndGet();
       case SESSION_DEAD -> sessionsDead.incrementAndGet();
     }
+  }
+
+  public void recordReconnect() {
+    reconnects.incrementAndGet();
+  }
+
+  public void recordReconnectFailure() {
+    reconnectFailures.incrementAndGet();
   }
 
   public boolean tryAcquireRecordingSlot(int max) {
@@ -72,5 +82,13 @@ public class TrafficStats implements TopicListener {
 
   public long swapSessionsDead() {
     return sessionsDead.getAndSet(0);
+  }
+
+  public long swapReconnects() {
+    return reconnects.getAndSet(0);
+  }
+
+  public long swapReconnectFailures() {
+    return reconnectFailures.getAndSet(0);
   }
 }

@@ -12,6 +12,7 @@ public class TrafficReporter {
   private static final long WINDOW_MS = 10_000L;
 
   private final TrafficStats trafficStats;
+  private final ClientRegistry clientRegistry;
 
   @Scheduled(fixedDelay = WINDOW_MS)
   public void report() {
@@ -21,14 +22,21 @@ public class TrafficReporter {
     long borderBlocks = trafficStats.swapBorderBlocks();
     long healthAcks = trafficStats.swapHealthAcks();
     long sessionsDead = trafficStats.swapSessionsDead();
+    long reconnects = trafficStats.swapReconnects();
+    long reconnectFailures = trafficStats.swapReconnectFailures();
     long recording = trafficStats.getRecordingClients();
 
+    log.info(
+        "clients={} reconnects={} reconnectFailures={}",
+        clientRegistry.size(),
+        reconnects,
+        reconnectFailures);
     if (recording == 0) {
       return;
     }
     double seconds = WINDOW_MS / 1000.0;
     log.info(
-        "traffic[{}clients] frames={} {}KB ({}KB/s, {}KB/s per client), blocks full={} border={}, healthAcks={} sessionsDead={}",
+        "traffic[{}recording] frames={} {}KB ({}KB/s, {}KB/s per client), blocks full={} border={}, healthAcks={} sessionsDead={}",
         recording,
         frames,
         bytes / 1024,

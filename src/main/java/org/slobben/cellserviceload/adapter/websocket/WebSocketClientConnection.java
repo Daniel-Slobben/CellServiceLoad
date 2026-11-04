@@ -68,11 +68,14 @@ public class WebSocketClientConnection {
         && MimeTypeUtils.APPLICATION_OCTET_STREAM.isCompatibleWith(headers.getContentType());
   }
 
+  // Sends on a closed session are dropped; a reconnect resends the whole view anyway.
   public void sendClientUpdateRequest(String[] blocksToRemove, String[] blocksToAdd) {
+    if (!session.isConnected()) return;
     session.send("/client-update", new ClientUpdateRequest(clientId, blocksToRemove, blocksToAdd));
   }
 
   public void sendHealthCheck() {
+    if (!session.isConnected()) return;
     session.send("/health-check", clientId);
   }
 
