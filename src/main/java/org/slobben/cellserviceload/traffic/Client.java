@@ -17,7 +17,7 @@ public class Client {
   private final Camera camera;
   // Some users zoom all the way out; they watch many more blocks.
   private final boolean zoomsOut;
-  private final TopicListener recorder;
+  private final TrafficStats stats;
   private final ReentrantLock lock = new ReentrantLock();
   private final Set<String> blocksInView = new HashSet<>();
   @Setter private int[] viewRange;
@@ -29,6 +29,9 @@ public class Client {
   private volatile boolean sessionDead;
   @Setter private volatile boolean reconnecting;
   @Setter private volatile long nextHealthCheckAtMs;
+  @Setter private volatile long healthCheckSentAtMs;
+  // Not reset on reconnect, so a gap includes the time a reconnect took.
+  private volatile long lastFrameAtMs;
 
   @Setter private volatile ViewportMover.Action action = ViewportMover.Action.IDLE;
   @Setter private volatile long actionEndsAtMs;
@@ -39,11 +42,11 @@ public class Client {
   @Setter private double zoomPointX;
   @Setter private double zoomPointY;
 
-  public Client(UUID id, Camera camera, boolean zoomsOut, TopicListener recorder) {
+  public Client(UUID id, Camera camera, boolean zoomsOut, TrafficStats stats) {
     this.id = id;
     this.camera = camera;
     this.zoomsOut = zoomsOut;
-    this.recorder = recorder;
+    this.stats = stats;
   }
 
   /** Jumps to a viewport and takes the blocks there as the view, as at start and after a reconnect. */
@@ -65,18 +68,27 @@ public class Client {
       @Override
       public void onBlocks(BlockFrame frame) {
         if (!topicId.equals(id)) return;
-        lastServerContactMs = System.currentTimeMillis();
-        recorder.onBlocks(frame);
+        long now = System.currentTimeMillis();
+        if (lastFrameAtMs > 0) {
+          stats.recordFrameGap(now - lastFrameAtMs);
+        }
+        lastFrameAtMs = now;
+        lastServerContactMs = now;
+        stats.recordFrame(frame);
       }
 
       @Override
       public void onHealthCheck(HealthCheckResponse.Type type) {
         if (!topicId.equals(id)) return;
-        lastServerContactMs = System.currentTimeMillis();
+        long now = System.currentTimeMillis();
+        lastServerContactMs = now;
         if (type == HealthCheckResponse.Type.SESSION_DEAD) {
           sessionDead = true;
+          stats.count(TrafficStats.Counter.SESSIONS_DEAD);
+        } else if (healthCheckSentAtMs > 0) {
+          stats.getHealthAckRtt().record(now - healthCheckSentAtMs);
+          healthCheckSentAtMs = 0;
         }
-        recorder.onHealthCheck(type);
       }
     };
   }

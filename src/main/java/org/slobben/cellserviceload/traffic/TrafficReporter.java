@@ -1,7 +1,13 @@
 package org.slobben.cellserviceload.traffic;
 
+import static org.slobben.cellserviceload.traffic.TrafficStats.Counter.*;
+
+import java.util.Locale;
+import java.util.Map;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slobben.cellserviceload.traffic.TrafficStats.Counter;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -10,6 +16,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class TrafficReporter {
   private static final long WINDOW_MS = 10_000L;
+  private static final double SECONDS = WINDOW_MS / 1000.0;
   private static final double ZOOMED_OUT_CELL_SIZE = 0.5;
 
   private final TrafficStats trafficStats;
@@ -17,15 +24,8 @@ public class TrafficReporter {
 
   @Scheduled(fixedDelay = WINDOW_MS)
   public void report() {
-    long frames = trafficStats.swapFrames();
-    long bytes = trafficStats.swapBytes();
-    long fullBlocks = trafficStats.swapFullBlocks();
-    long borderBlocks = trafficStats.swapBorderBlocks();
-    long healthAcks = trafficStats.swapHealthAcks();
-    long sessionsDead = trafficStats.swapSessionsDead();
-    long reconnects = trafficStats.swapReconnects();
-    long reconnectFailures = trafficStats.swapReconnectFailures();
-    long recording = trafficStats.getRecordingClients();
+    Map<Counter, Long> counts = trafficStats.swapCounters();
+    long largestFrameBytes = trafficStats.swapLargestFrameBytes();
 
     int clients = 0;
     long blocksWatched = 0;
@@ -40,29 +40,43 @@ public class TrafficReporter {
         zoomedOut++;
       }
     }
+
+    long bytes = counts.get(FRAME_BYTES);
     log.info(
-        "clients={} zoomedOut={} blocksWatched avg={} max={} total={}, reconnects={} reconnectFailures={}",
+        "clients={} zoomedOut={} blocksWatched avg={} max={} total={}",
         clients,
         zoomedOut,
         clients == 0 ? 0 : blocksWatched / clients,
         maxBlocksWatched,
-        blocksWatched,
-        reconnects,
-        reconnectFailures);
-    if (recording == 0) {
-      return;
-    }
-    double seconds = WINDOW_MS / 1000.0;
+        blocksWatched);
     log.info(
-        "traffic[{}recording] frames={} {}KB ({}KB/s, {}KB/s per client), blocks full={} border={}, healthAcks={} sessionsDead={}",
-        recording,
-        frames,
-        bytes / 1024,
-        (long) (bytes / 1024 / seconds),
-        (long) (bytes / 1024.0 / seconds / recording),
-        fullBlocks,
-        borderBlocks,
-        healthAcks,
-        sessionsDead);
+        "frames {}/s {}MB/s ({}KB/s per client), largest {}KB, blocks full {}/s border {}/s",
+        perSecond(counts.get(FRAMES)),
+        String.format(Locale.ROOT, "%.2f", bytes / SECONDS / (1024 * 1024)),
+        clients == 0 ? 0 : (long) (bytes / SECONDS / 1024 / clients),
+        largestFrameBytes / 1024,
+        perSecond(counts.get(FULL_BLOCKS)),
+        perSecond(counts.get(BORDER_BLOCKS)));
+    log.info(
+        "frame gaps ms {}, over {}ms={}",
+        trafficStats.getFrameGaps().swap(),
+        SessionKeeper.RECONNECT_THRESHOLD_MS,
+        counts.get(SLOW_FRAME_GAPS));
+    log.info(
+        "sessions: health ack ms {}, sessionsDead={} reconnects={} reconnectFailures={} connectFailures={}",
+        trafficStats.getHealthAckRtt().swap(),
+        counts.get(SESSIONS_DEAD),
+        counts.get(RECONNECTS),
+        counts.get(RECONNECT_FAILURES),
+        counts.get(CONNECT_FAILURES));
+    log.info(
+        "rest ms: settings {}, viewport {}, reconnect {}",
+        trafficStats.getSettingsLatency().swap(),
+        trafficStats.getViewportLatency().swap(),
+        trafficStats.getReconnectLatency().swap());
+  }
+
+  private static long perSecond(long count) {
+    return Math.round(count / SECONDS);
   }
 }
