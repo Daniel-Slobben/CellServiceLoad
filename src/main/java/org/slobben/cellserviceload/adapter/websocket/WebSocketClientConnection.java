@@ -3,7 +3,6 @@ package org.slobben.cellserviceload.adapter.websocket;
 import java.lang.reflect.Type;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.IntConsumer;
 
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -12,12 +11,11 @@ import org.springframework.messaging.simp.stomp.StompFrameHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
 import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
+import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 
 @Slf4j
 public class WebSocketClientConnection {
-
-  private static final StompFrameHandler DISCARDING_HANDLER = countingHandler(null);
 
   private final UUID clientId;
   private final StompSession session;
@@ -28,44 +26,54 @@ public class WebSocketClientConnection {
   }
 
   public static CompletableFuture<WebSocketClientConnection> connect(
-      WebSocketStompClient stompClient,
-      UUID clientId,
-      String url,
-      @Nullable IntConsumer partialRecorder,
-      @Nullable IntConsumer fullRecorder) {
+      WebSocketStompClient stompClient, UUID clientId, String wsUrl, TopicListener listener) {
     return stompClient
-        .connectAsync("wss://" + url + "/ws", new StompSessionHandlerAdapter() {})
+        .connectAsync(wsUrl, new StompSessionHandlerAdapter() {})
         .thenApply(
             session -> {
-              session.subscribe(
-                  "/topic/" + clientId,
-                  partialRecorder == null ? DISCARDING_HANDLER : countingHandler(partialRecorder));
-              session.subscribe(
-                  "/topic/full/" + clientId,
-                  fullRecorder == null ? DISCARDING_HANDLER : countingHandler(fullRecorder));
+              // Block frames and health check responses share this topic; the content type tells them apart.
+              session.subscribe("/topic/" + clientId, topicHandler(listener));
               return new WebSocketClientConnection(clientId, session);
             });
   }
 
-  private static StompFrameHandler countingHandler(@Nullable IntConsumer recorder) {
+  private static StompFrameHandler topicHandler(TopicListener listener) {
     return new StompFrameHandler() {
       @Override
       public @NonNull Type getPayloadType(@NonNull StompHeaders headers) {
-        return byte[].class;
+        return isBinary(headers) ? byte[].class : HealthCheckResponse.class;
       }
 
       @Override
       public void handleFrame(@NonNull StompHeaders headers, @Nullable Object payload) {
-        if (recorder != null && payload instanceof byte[] bytes) {
-          recorder.accept(bytes.length);
+        if (isBinary(headers)) {
+          // A tick without block data arrives as an empty frame, with a null payload.
+          byte[] bytes = payload instanceof byte[] b ? b : new byte[0];
+          try {
+            listener.onBlocks(BlockFrame.read(bytes));
+          } catch (IllegalArgumentException e) {
+            log.warn("dropping malformed block frame: {}", e.getMessage());
+          }
+        } else if (payload instanceof HealthCheckResponse response) {
+          listener.onHealthCheck(response.type());
+        } else {
+          log.warn("unexpected message on the block topic: {}", payload);
         }
       }
     };
   }
 
-  public void sendClientUpdateRequest(
-      @Nullable String[] blockToRemove, @Nullable String[] blockToAdd) {
-    session.send("/client-update", new ClientUpdateRequest(clientId, blockToRemove, blockToAdd));
+  private static boolean isBinary(StompHeaders headers) {
+    return headers.getContentType() != null
+        && MimeTypeUtils.APPLICATION_OCTET_STREAM.isCompatibleWith(headers.getContentType());
+  }
+
+  public void sendClientUpdateRequest(String[] blocksToRemove, String[] blocksToAdd) {
+    session.send("/client-update", new ClientUpdateRequest(clientId, blocksToRemove, blocksToAdd));
+  }
+
+  public void sendHealthCheck() {
+    session.send("/health-check", clientId);
   }
 
   public void disconnect() {
