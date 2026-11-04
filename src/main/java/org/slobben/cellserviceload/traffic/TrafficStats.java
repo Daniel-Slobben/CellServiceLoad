@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicLongArray;
 import lombok.AccessLevel;
 import lombok.Getter;
 import org.slobben.cellserviceload.adapter.websocket.BlockFrame;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /** Counts for all clients, swapped out by the {@link TrafficReporter} every window. */
@@ -41,6 +42,9 @@ public class TrafficStats {
   @Getter(AccessLevel.NONE)
   private final AtomicLong largestFrameBytes = new AtomicLong();
 
+  @Value("${load.reconnect-threshold-ms}")
+  private long reconnectThresholdMs;
+
   public void count(Counter counter) {
     counters.incrementAndGet(counter.ordinal());
   }
@@ -55,7 +59,7 @@ public class TrafficStats {
 
   public void recordFrameGap(long ms) {
     frameGaps.record(ms);
-    if (ms > SessionKeeper.RECONNECT_THRESHOLD_MS) {
+    if (ms > reconnectThresholdMs) {
       count(Counter.SLOW_FRAME_GAPS);
     }
   }

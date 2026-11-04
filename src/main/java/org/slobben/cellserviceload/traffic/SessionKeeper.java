@@ -16,15 +16,13 @@ import org.springframework.web.socket.messaging.WebSocketStompClient;
 
 /**
  * Keeps client sessions alive the way the frontend does: a health check every 8 seconds, and a
- * reconnect on SESSION_DEAD or when the server has been silent for 1.5 seconds.
+ * reconnect on SESSION_DEAD or when the server has been silent for load.reconnect-threshold-ms.
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class SessionKeeper {
   static final long HEALTH_CHECK_INTERVAL_MS = 8_000;
-  // Ticks come every 500 ms, so a short silence means the session is gone.
-  static final long RECONNECT_THRESHOLD_MS = 1_500;
   private static final long CONNECT_TIMEOUT_MS = 10_000;
 
   private final ClientRegistry clientRegistry;
@@ -35,6 +33,10 @@ public class SessionKeeper {
 
   @Value("${cell-service.ws-url}")
   private String wsUrl;
+
+  // The frontend's reconnectThresholdMs; change it to try out another watchdog.
+  @Value("${load.reconnect-threshold-ms}")
+  private long reconnectThresholdMs;
 
   public CompletableFuture<WebSocketClientConnection> connect(Client client) {
     return WebSocketClientConnection.connect(
@@ -66,7 +68,7 @@ public class SessionKeeper {
   public void watchdog() {
     long now = System.currentTimeMillis();
     for (Client client : clientRegistry.all()) {
-      boolean silent = client.getLastServerContactMs() < now - RECONNECT_THRESHOLD_MS;
+      boolean silent = client.getLastServerContactMs() < now - reconnectThresholdMs;
       if (client.isReconnecting() || !(silent || client.isSessionDead())) {
         continue;
       }

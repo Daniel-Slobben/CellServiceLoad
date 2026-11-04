@@ -34,10 +34,16 @@ public class WebSocketConfig {
     return pool;
   }
 
+  // Every client opens its own websocket, like separate browsers would. Jetty's defaults (64
+  // handshakes at a time, 1024 queued) would throttle those on our side during a reconnect storm.
+  private static final int MAX_CONNECTIONS = 10_000;
+
   @Bean(initMethod = "start", destroyMethod = "stop")
   public HttpClient jettyHttpClient(QueuedThreadPool jettyThreadPool) {
     HttpClient httpClient = new HttpClient();
     httpClient.setExecutor(jettyThreadPool);
+    httpClient.setMaxConnectionsPerDestination(MAX_CONNECTIONS);
+    httpClient.setMaxRequestsQueuedPerDestination(MAX_CONNECTIONS);
     return httpClient;
   }
 

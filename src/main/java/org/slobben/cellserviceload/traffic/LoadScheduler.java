@@ -36,11 +36,15 @@ public class LoadScheduler {
 
   private final Semaphore inFlight = new Semaphore(MAX_IN_FLIGHT_CONNECTS);
 
+  /** Clients waiting for their settings or first connect; ramp-up stalls when this sits at the max. */
+  public int starting() {
+    return MAX_IN_FLIGHT_CONNECTS - inFlight.availablePermits();
+  }
+
   @Scheduled(fixedDelay = 200)
   public void rampUp() {
     for (int i = 0; i < MAX_STARTS_PER_TICK; i++) {
-      int connecting = MAX_IN_FLIGHT_CONNECTS - inFlight.availablePermits();
-      if (clientRegistry.size() + connecting >= maxClients || !inFlight.tryAcquire()) {
+      if (clientRegistry.size() + starting() >= maxClients || !inFlight.tryAcquire()) {
         return;
       }
       virtualThreadExecutor.execute(this::createClient);
