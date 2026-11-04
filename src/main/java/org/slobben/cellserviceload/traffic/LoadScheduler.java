@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slobben.cellserviceload.adapter.rest.ServiceApiWrapper;
 import org.slobben.cellserviceload.adapter.rest.Settings;
+import org.slobben.cellserviceload.adapter.websocket.TopicListener;
 import org.slobben.cellserviceload.adapter.websocket.WebSocketClientConnection;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -19,7 +20,6 @@ import org.springframework.web.socket.messaging.WebSocketStompClient;
 @RequiredArgsConstructor
 @Slf4j
 public class LoadScheduler {
-  private static final int MAX_CLIENTS = 3000;
   private static final int MAX_IN_FLIGHT_CONNECTS = 16;
   private static final int MAX_STARTS_PER_TICK = 4;
   private static final int INITIAL_VIEW_SIDE = 3;
@@ -32,8 +32,11 @@ public class LoadScheduler {
   private final Executor virtualThreadExecutor;
   private final TrafficStats trafficStats;
 
-  @Value("${cell-service.url}")
-  private String url;
+  @Value("${cell-service.ws-url}")
+  private String wsUrl;
+
+  @Value("${load.max-clients}")
+  private int maxClients;
 
   private final Semaphore inFlight = new Semaphore(MAX_IN_FLIGHT_CONNECTS);
 
@@ -41,7 +44,7 @@ public class LoadScheduler {
   public void rampUp() {
     int current = clientRegistry.size();
     log.info("current amount of clients: {}", current);
-    if (current >= MAX_CLIENTS) {
+    if (current >= maxClients) {
       return;
     }
     for (int i = 0; i < MAX_STARTS_PER_TICK; i++) {
@@ -54,9 +57,9 @@ public class LoadScheduler {
 
   private void createClient() {
     try {
-      Settings settings = serviceApiWrapper.getNewClient();
-      int anchorX = settings.chaosHit().worldX() / settings.blockSize();
-      int anchorY = settings.chaosHit().worldY() / settings.blockSize();
+      Settings settings = serviceApiWrapper.getSettings();
+      int anchorX = Math.floorDiv(settings.viewport().x(), settings.blockSize());
+      int anchorY = Math.floorDiv(settings.viewport().y(), settings.blockSize());
       Set<String> initialBlocks = ViewportMover.computeView(anchorX, anchorY, INITIAL_VIEW_SIDE);
       String[] blocksToAdd = initialBlocks.toArray(new String[0]);
 
@@ -66,9 +69,8 @@ public class LoadScheduler {
       WebSocketClientConnection.connect(
               webSocketStompClient,
               settings.clientId(),
-              url,
-              record ? trafficStats::recordPartial : null,
-              record ? trafficStats::recordFull : null)
+              wsUrl,
+              record ? trafficStats : TopicListener.NONE)
           .whenComplete(
               (connection, error) -> {
                 try {
@@ -76,7 +78,7 @@ public class LoadScheduler {
                     log.warn("connect failed for {}: {}", settings.clientId(), error.toString());
                     return;
                   }
-                  connection.sendClientUpdateRequest(null, blocksToAdd);
+                  connection.sendClientUpdateRequest(new String[0], blocksToAdd);
                   Client client =
                       new Client(
                           settings.clientId(),

@@ -15,10 +15,12 @@ public class TrafficReporter {
 
   @Scheduled(fixedDelay = WINDOW_MS)
   public void report() {
-    long fullBytes = trafficStats.swapFullBytes();
-    long fullMsgs = trafficStats.swapFullMessages();
-    long partBytes = trafficStats.swapPartialBytes();
-    long partMsgs = trafficStats.swapPartialMessages();
+    long frames = trafficStats.swapFrames();
+    long bytes = trafficStats.swapBytes();
+    long fullBlocks = trafficStats.swapFullBlocks();
+    long borderBlocks = trafficStats.swapBorderBlocks();
+    long healthAcks = trafficStats.swapHealthAcks();
+    long sessionsDead = trafficStats.swapSessionsDead();
     long recording = trafficStats.getRecordingClients();
 
     if (recording == 0) {
@@ -26,15 +28,15 @@ public class TrafficReporter {
     }
     double seconds = WINDOW_MS / 1000.0;
     log.info(
-        "traffic[{}clients] full={}msg {}KB ({}KB/s), partial={}msg {}KB ({}KB/s), avgPerClient full={}KB/s partial={}KB/s",
+        "traffic[{}clients] frames={} {}KB ({}KB/s, {}KB/s per client), blocks full={} border={}, healthAcks={} sessionsDead={}",
         recording,
-        fullMsgs,
-        fullBytes / 1024,
-        (long) (fullBytes / 1024 / seconds),
-        partMsgs,
-        partBytes / 1024,
-        (long) (partBytes / 1024 / seconds),
-        (long) (fullBytes / 1024.0 / seconds / recording),
-        (long) (partBytes / 1024.0 / seconds / recording));
+        frames,
+        bytes / 1024,
+        (long) (bytes / 1024 / seconds),
+        (long) (bytes / 1024.0 / seconds / recording),
+        fullBlocks,
+        borderBlocks,
+        healthAcks,
+        sessionsDead);
   }
 }

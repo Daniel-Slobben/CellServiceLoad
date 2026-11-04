@@ -5,4 +5,8 @@ server:
   port: 8085
 
 cell-service:
-  url: localhost:8080
+  http-url: http://localhost:8080
+  ws-url: ws://localhost:8080/ws
+
+load:
+  max-clients: 3000

@@ -40,7 +40,7 @@ public class SettingsRefresher {
             }
             try {
               client.setNextRefreshAtMs(System.currentTimeMillis() + REFRESH_INTERVAL_MS);
-              serviceApiWrapper.getNewClient();
+              serviceApiWrapper.getSettings();
             } catch (RuntimeException e) {
               log.debug("settings refresh failed for {}: {}", client.getId(), e.toString());
             } finally {

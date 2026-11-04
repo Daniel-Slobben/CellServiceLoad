@@ -2,25 +2,36 @@ package org.slobben.cellserviceload.traffic;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.slobben.cellserviceload.adapter.websocket.BlockFrame;
+import org.slobben.cellserviceload.adapter.websocket.HealthCheckResponse;
+import org.slobben.cellserviceload.adapter.websocket.TopicListener;
 import org.springframework.stereotype.Component;
 
 @Component
-public class TrafficStats {
+public class TrafficStats implements TopicListener {
   private final AtomicLong recordingClients = new AtomicLong();
 
-  private final AtomicLong fullBytes = new AtomicLong();
-  private final AtomicLong fullMessages = new AtomicLong();
-  private final AtomicLong partialBytes = new AtomicLong();
-  private final AtomicLong partialMessages = new AtomicLong();
+  private final AtomicLong frames = new AtomicLong();
+  private final AtomicLong bytes = new AtomicLong();
+  private final AtomicLong fullBlocks = new AtomicLong();
+  private final AtomicLong borderBlocks = new AtomicLong();
+  private final AtomicLong healthAcks = new AtomicLong();
+  private final AtomicLong sessionsDead = new AtomicLong();
 
-  public void recordFull(int bytes) {
-    fullBytes.addAndGet(bytes);
-    fullMessages.incrementAndGet();
+  @Override
+  public void onBlocks(BlockFrame frame) {
+    frames.incrementAndGet();
+    bytes.addAndGet(frame.bytes());
+    fullBlocks.addAndGet(frame.fullBlocks());
+    borderBlocks.addAndGet(frame.borderBlocks());
   }
 
-  public void recordPartial(int bytes) {
-    partialBytes.addAndGet(bytes);
-    partialMessages.incrementAndGet();
+  @Override
+  public void onHealthCheck(HealthCheckResponse.Type type) {
+    switch (type) {
+      case HEALTH_ACK -> healthAcks.incrementAndGet();
+      case SESSION_DEAD -> sessionsDead.incrementAndGet();
+    }
   }
 
   public boolean tryAcquireRecordingSlot(int max) {
@@ -39,19 +50,27 @@ public class TrafficStats {
     return recordingClients.get();
   }
 
-  public long swapFullBytes() {
-    return fullBytes.getAndSet(0);
+  public long swapFrames() {
+    return frames.getAndSet(0);
   }
 
-  public long swapFullMessages() {
-    return fullMessages.getAndSet(0);
+  public long swapBytes() {
+    return bytes.getAndSet(0);
   }
 
-  public long swapPartialBytes() {
-    return partialBytes.getAndSet(0);
+  public long swapFullBlocks() {
+    return fullBlocks.getAndSet(0);
   }
 
-  public long swapPartialMessages() {
-    return partialMessages.getAndSet(0);
+  public long swapBorderBlocks() {
+    return borderBlocks.getAndSet(0);
+  }
+
+  public long swapHealthAcks() {
+    return healthAcks.getAndSet(0);
+  }
+
+  public long swapSessionsDead() {
+    return sessionsDead.getAndSet(0);
   }
 }
