@@ -21,6 +21,7 @@ public class TrafficReporter {
 
   private final TrafficStats trafficStats;
   private final ClientRegistry clientRegistry;
+  private final LoadScheduler loadScheduler;
 
   @Scheduled(fixedDelay = WINDOW_MS)
   public void report() {
@@ -31,6 +32,7 @@ public class TrafficReporter {
     long blocksWatched = 0;
     int maxBlocksWatched = 0;
     int zoomedOut = 0;
+    int reconnecting = 0;
     for (Client client : clientRegistry.all()) {
       int watched = client.getBlocksInView().size();
       clients++;
@@ -39,12 +41,17 @@ public class TrafficReporter {
       if (client.getCamera().cellSize() < ZOOMED_OUT_CELL_SIZE) {
         zoomedOut++;
       }
+      if (client.isReconnecting()) {
+        reconnecting++;
+      }
     }
 
     long bytes = counts.get(FRAME_BYTES);
     log.info(
-        "clients={} zoomedOut={} blocksWatched avg={} max={} total={}",
+        "clients={} reconnecting={} starting={} zoomedOut={} blocksWatched avg={} max={} total={}",
         clients,
+        reconnecting,
+        loadScheduler.starting(),
         zoomedOut,
         clients == 0 ? 0 : blocksWatched / clients,
         maxBlocksWatched,
@@ -60,7 +67,7 @@ public class TrafficReporter {
     log.info(
         "frame gaps ms {}, over {}ms={}",
         trafficStats.getFrameGaps().swap(),
-        SessionKeeper.RECONNECT_THRESHOLD_MS,
+        trafficStats.getReconnectThresholdMs(),
         counts.get(SLOW_FRAME_GAPS));
     log.info(
         "sessions: health ack ms {}, sessionsDead={} reconnects={} reconnectFailures={} connectFailures={}",
