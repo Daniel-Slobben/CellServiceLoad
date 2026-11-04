@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class TrafficReporter {
   private static final long WINDOW_MS = 10_000L;
+  private static final double ZOOMED_OUT_CELL_SIZE = 0.5;
 
   private final TrafficStats trafficStats;
   private final ClientRegistry clientRegistry;
@@ -26,9 +27,26 @@ public class TrafficReporter {
     long reconnectFailures = trafficStats.swapReconnectFailures();
     long recording = trafficStats.getRecordingClients();
 
+    int clients = 0;
+    long blocksWatched = 0;
+    int maxBlocksWatched = 0;
+    int zoomedOut = 0;
+    for (Client client : clientRegistry.all()) {
+      int watched = client.getBlocksInView().size();
+      clients++;
+      blocksWatched += watched;
+      maxBlocksWatched = Math.max(maxBlocksWatched, watched);
+      if (client.getCamera().cellSize() < ZOOMED_OUT_CELL_SIZE) {
+        zoomedOut++;
+      }
+    }
     log.info(
-        "clients={} reconnects={} reconnectFailures={}",
-        clientRegistry.size(),
+        "clients={} zoomedOut={} blocksWatched avg={} max={} total={}, reconnects={} reconnectFailures={}",
+        clients,
+        zoomedOut,
+        clients == 0 ? 0 : blocksWatched / clients,
+        maxBlocksWatched,
+        blocksWatched,
         reconnects,
         reconnectFailures);
     if (recording == 0) {

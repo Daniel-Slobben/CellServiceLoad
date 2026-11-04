@@ -14,10 +14,13 @@ import org.slobben.cellserviceload.adapter.websocket.WebSocketClientConnection;
 
 @Getter
 public class Client {
-  private final int blockSize;
+  private final Camera camera;
+  // Some users zoom all the way out; they watch many more blocks.
+  private final boolean zoomsOut;
   private final TopicListener recorder;
   private final ReentrantLock lock = new ReentrantLock();
-  private final Set<String> blocksInView;
+  private final Set<String> blocksInView = new HashSet<>();
+  @Setter private int[] viewRange;
 
   // Change on reconnect: the server hands out a new id and the socket is renewed.
   @Setter private volatile UUID id;
@@ -27,33 +30,28 @@ public class Client {
   @Setter private volatile boolean reconnecting;
   @Setter private volatile long nextHealthCheckAtMs;
 
-  private int anchorX;
-  private int anchorY;
-  @Setter private int originX;
-  @Setter private int originY;
-  @Setter private int viewSide;
-  @Setter private int dx;
-  @Setter private int dy;
-  @Setter private int ticksInDirection;
-  @Setter private long nextMoveAtMs;
+  @Setter private volatile ViewportMover.Action action = ViewportMover.Action.IDLE;
+  @Setter private volatile long actionEndsAtMs;
+  @Setter private long lastMoveAtMs;
+  @Setter private double panVelocityX;
+  @Setter private double panVelocityY;
+  @Setter private double zoomTarget;
+  @Setter private double zoomPointX;
+  @Setter private double zoomPointY;
 
-  public Client(UUID id, int blockSize, int anchorX, int anchorY, int viewSide, TopicListener recorder) {
+  public Client(UUID id, Camera camera, boolean zoomsOut, TopicListener recorder) {
     this.id = id;
-    this.blockSize = blockSize;
-    this.viewSide = viewSide;
+    this.camera = camera;
+    this.zoomsOut = zoomsOut;
     this.recorder = recorder;
-    this.blocksInView = new HashSet<>();
-    recenter(anchorX, anchorY);
   }
 
-  /** Jumps to a new viewport, as the frontend does after a reconnect that returns one. */
-  public void recenter(int anchorX, int anchorY) {
-    this.anchorX = anchorX;
-    this.anchorY = anchorY;
-    this.originX = anchorX;
-    this.originY = anchorY;
+  /** Jumps to a viewport and takes the blocks there as the view, as at start and after a reconnect. */
+  public void centerOn(int worldX, int worldY) {
+    camera.centerOn(worldX, worldY);
+    viewRange = camera.blockRange();
     blocksInView.clear();
-    blocksInView.addAll(ViewportMover.computeView(anchorX, anchorY, viewSide));
+    blocksInView.addAll(Camera.blocksIn(viewRange));
   }
 
   public void markServerContact() {
