@@ -19,15 +19,18 @@ import org.springframework.web.socket.messaging.WebSocketStompClient;
 @RequiredArgsConstructor
 @Slf4j
 public class LoadScheduler {
-  private static final int MAX_CLIENTS = 1500;
+  private static final int MAX_CLIENTS = 3000;
   private static final int MAX_IN_FLIGHT_CONNECTS = 16;
   private static final int MAX_STARTS_PER_TICK = 4;
   private static final int INITIAL_VIEW_SIDE = 3;
+  private static final int RECORDING_CLIENTS = 100;
+  private static final int RECORDING_SAMPLE_EVERY = 20;
 
   private final ClientRegistry clientRegistry;
   private final ServiceApiWrapper serviceApiWrapper;
   private final WebSocketStompClient webSocketStompClient;
   private final Executor virtualThreadExecutor;
+  private final TrafficStats trafficStats;
 
   @Value("${cell-service.url}")
   private String url;
@@ -57,7 +60,15 @@ public class LoadScheduler {
       Set<String> initialBlocks = ViewportMover.computeView(anchorX, anchorY, INITIAL_VIEW_SIDE);
       String[] blocksToAdd = initialBlocks.toArray(new String[0]);
 
-      WebSocketClientConnection.connect(webSocketStompClient, settings.clientId(), url)
+      boolean record =
+          clientRegistry.size() % RECORDING_SAMPLE_EVERY == 0
+              && trafficStats.tryAcquireRecordingSlot(RECORDING_CLIENTS);
+      WebSocketClientConnection.connect(
+              webSocketStompClient,
+              settings.clientId(),
+              url,
+              record ? trafficStats::recordPartial : null,
+              record ? trafficStats::recordFull : null)
           .whenComplete(
               (connection, error) -> {
                 try {
