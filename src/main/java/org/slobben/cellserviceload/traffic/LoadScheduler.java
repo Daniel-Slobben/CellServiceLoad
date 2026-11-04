@@ -19,7 +19,6 @@ import org.springframework.stereotype.Component;
 public class LoadScheduler {
   private static final int MAX_IN_FLIGHT_CONNECTS = 16;
   private static final int MAX_STARTS_PER_TICK = 4;
-  private static final int INITIAL_VIEW_SIDE = 3;
   private static final int RECORDING_CLIENTS = 100;
   private static final int RECORDING_SAMPLE_EVERY = 20;
 
@@ -31,6 +30,12 @@ public class LoadScheduler {
 
   @Value("${load.max-clients}")
   private int maxClients;
+
+  @Value("${load.phone-share}")
+  private double phoneShare;
+
+  @Value("${load.zoomed-out-share}")
+  private double zoomedOutShare;
 
   private final Semaphore inFlight = new Semaphore(MAX_IN_FLIGHT_CONNECTS);
 
@@ -51,14 +56,15 @@ public class LoadScheduler {
       boolean record =
           clientRegistry.size() % RECORDING_SAMPLE_EVERY == 0
               && trafficStats.tryAcquireRecordingSlot(RECORDING_CLIENTS);
+      ThreadLocalRandom rng = ThreadLocalRandom.current();
+      Device device = rng.nextDouble() < phoneShare ? Device.PHONE : Device.DESKTOP;
       Client client =
           new Client(
               settings.clientId(),
-              settings.blockSize(),
-              Math.floorDiv(settings.viewport().x(), settings.blockSize()),
-              Math.floorDiv(settings.viewport().y(), settings.blockSize()),
-              INITIAL_VIEW_SIDE,
+              new Camera(device, settings.blockSize()),
+              rng.nextDouble() < zoomedOutShare,
               record ? trafficStats : TopicListener.NONE);
+      client.centerOn(settings.viewport().x(), settings.viewport().y());
 
       sessionKeeper
           .connect(client)
@@ -70,7 +76,9 @@ public class LoadScheduler {
                     return;
                   }
                   sessionKeeper.start(client, connection);
-                  client.setNextMoveAtMs(System.currentTimeMillis() + ThreadLocalRandom.current().nextInt(3_000));
+                  long now = System.currentTimeMillis();
+                  client.setLastMoveAtMs(now);
+                  client.setActionEndsAtMs(now + ThreadLocalRandom.current().nextInt(3_000));
                   clientRegistry.add(client);
                 } finally {
                   inFlight.release();

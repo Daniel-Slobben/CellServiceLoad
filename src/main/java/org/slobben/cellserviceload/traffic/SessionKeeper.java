@@ -81,9 +81,7 @@ public class SessionKeeper {
           serviceApiWrapper.reconnect(client.getBlocksInView().toArray(new String[0]));
       client.getConnection().disconnect();
       if (response.viewport() != null) {
-        client.recenter(
-            Math.floorDiv(response.viewport().x(), client.getBlockSize()),
-            Math.floorDiv(response.viewport().y(), client.getBlockSize()));
+        client.centerOn(response.viewport().x(), response.viewport().y());
       }
       // Set before subscribing, so the old topic's last messages are ignored.
       client.setId(response.clientId());

@@ -10,3 +10,5 @@ cell-service:
 
 load:
   max-clients: 3000
+  phone-share: 0.7
+  zoomed-out-share: 0.15
