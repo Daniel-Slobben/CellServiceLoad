@@ -1,21 +1,18 @@
 package org.slobben.cellserviceload.traffic;
 
 import java.util.Collection;
-import java.util.UUID;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Component;
 
+// Keyed by instance: a client's id changes on every reconnect.
 @Component
 public class ClientRegistry {
-  private final ConcurrentHashMap<UUID, Client> clients = new ConcurrentHashMap<>();
+  private final Set<Client> clients = ConcurrentHashMap.newKeySet();
 
   public void add(Client client) {
-    clients.put(client.getId(), client);
-  }
-
-  public void remove(UUID id) {
-    clients.remove(id);
+    clients.add(client);
   }
 
   public int size() {
@@ -23,6 +20,6 @@ public class ClientRegistry {
   }
 
   public Collection<Client> all() {
-    return clients.values();
+    return clients;
   }
 }

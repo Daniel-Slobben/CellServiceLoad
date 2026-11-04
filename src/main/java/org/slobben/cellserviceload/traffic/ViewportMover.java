@@ -102,7 +102,7 @@ public class ViewportMover {
     String[] toAdd = diff(newBlocks, oldBlocks);
 
     if (toRemove.length > 0 || toAdd.length > 0) {
-      client.getWebSocketClientConnection().sendClientUpdateRequest(toRemove, toAdd);
+      client.getConnection().sendClientUpdateRequest(toRemove, toAdd);
       oldBlocks.removeAll(Set.of(toRemove));
       for (String b : toAdd) {
         oldBlocks.add(b);

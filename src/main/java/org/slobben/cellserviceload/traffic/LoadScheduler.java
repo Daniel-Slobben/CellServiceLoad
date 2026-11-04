@@ -1,6 +1,5 @@
 package org.slobben.cellserviceload.traffic;
 
-import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
@@ -10,11 +9,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.slobben.cellserviceload.adapter.rest.ServiceApiWrapper;
 import org.slobben.cellserviceload.adapter.rest.Settings;
 import org.slobben.cellserviceload.adapter.websocket.TopicListener;
-import org.slobben.cellserviceload.adapter.websocket.WebSocketClientConnection;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.messaging.WebSocketStompClient;
 
 @Component
 @RequiredArgsConstructor
@@ -28,12 +25,9 @@ public class LoadScheduler {
 
   private final ClientRegistry clientRegistry;
   private final ServiceApiWrapper serviceApiWrapper;
-  private final WebSocketStompClient webSocketStompClient;
+  private final SessionKeeper sessionKeeper;
   private final Executor virtualThreadExecutor;
   private final TrafficStats trafficStats;
-
-  @Value("${cell-service.ws-url}")
-  private String wsUrl;
 
   @Value("${load.max-clients}")
   private int maxClients;
@@ -42,13 +36,9 @@ public class LoadScheduler {
 
   @Scheduled(fixedDelay = 200)
   public void rampUp() {
-    int current = clientRegistry.size();
-    log.info("current amount of clients: {}", current);
-    if (current >= maxClients) {
-      return;
-    }
     for (int i = 0; i < MAX_STARTS_PER_TICK; i++) {
-      if (!inFlight.tryAcquire()) {
+      int connecting = MAX_IN_FLIGHT_CONNECTS - inFlight.availablePermits();
+      if (clientRegistry.size() + connecting >= maxClients || !inFlight.tryAcquire()) {
         return;
       }
       virtualThreadExecutor.execute(this::createClient);
@@ -58,39 +48,29 @@ public class LoadScheduler {
   private void createClient() {
     try {
       Settings settings = serviceApiWrapper.getSettings();
-      int anchorX = Math.floorDiv(settings.viewport().x(), settings.blockSize());
-      int anchorY = Math.floorDiv(settings.viewport().y(), settings.blockSize());
-      Set<String> initialBlocks = ViewportMover.computeView(anchorX, anchorY, INITIAL_VIEW_SIDE);
-      String[] blocksToAdd = initialBlocks.toArray(new String[0]);
-
       boolean record =
           clientRegistry.size() % RECORDING_SAMPLE_EVERY == 0
               && trafficStats.tryAcquireRecordingSlot(RECORDING_CLIENTS);
-      WebSocketClientConnection.connect(
-              webSocketStompClient,
+      Client client =
+          new Client(
               settings.clientId(),
-              wsUrl,
-              record ? trafficStats : TopicListener.NONE)
+              settings.blockSize(),
+              Math.floorDiv(settings.viewport().x(), settings.blockSize()),
+              Math.floorDiv(settings.viewport().y(), settings.blockSize()),
+              INITIAL_VIEW_SIDE,
+              record ? trafficStats : TopicListener.NONE);
+
+      sessionKeeper
+          .connect(client)
           .whenComplete(
               (connection, error) -> {
                 try {
                   if (error != null) {
-                    log.warn("connect failed for {}: {}", settings.clientId(), error.toString());
+                    log.warn("connect failed for {}: {}", client.getId(), error.toString());
                     return;
                   }
-                  connection.sendClientUpdateRequest(new String[0], blocksToAdd);
-                  Client client =
-                      new Client(
-                          settings.clientId(),
-                          anchorX,
-                          anchorY,
-                          INITIAL_VIEW_SIDE,
-                          initialBlocks,
-                          connection);
-                  long now = System.currentTimeMillis();
-                  ThreadLocalRandom rng = ThreadLocalRandom.current();
-                  client.setNextMoveAtMs(now + rng.nextInt(3_000));
-                  client.setNextRefreshAtMs(now + rng.nextInt((int) SettingsRefresher.REFRESH_INTERVAL_MS));
+                  sessionKeeper.start(client, connection);
+                  client.setNextMoveAtMs(System.currentTimeMillis() + ThreadLocalRandom.current().nextInt(3_000));
                   clientRegistry.add(client);
                 } finally {
                   inFlight.release();
