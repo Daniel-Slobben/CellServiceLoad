@@ -19,8 +19,7 @@ class DtoMappingTest {
     Settings settings =
         MAPPER.readValue(
             """
-            {"blockSize":2000,"clientId":"%s","viewport":{"x":-4100,"y":250},
-             "blocks":[{"x":-3,"y":0,"generation":12,"type":"FULL","encodedCells":"AAEC"}]}
+            {"blockSize":2000,"clientId":"%s","viewport":{"x":-4100,"y":250}}
             """
                 .formatted(CLIENT_ID),
             Settings.class);
@@ -28,7 +27,6 @@ class DtoMappingTest {
     assertEquals(2000, settings.blockSize());
     assertEquals(UUID.fromString(CLIENT_ID), settings.clientId());
     assertEquals(new Coordinates(-4100, 250), settings.viewport());
-    assertEquals(new Block(-3, 0, 12, "FULL", "AAEC"), settings.blocks().getFirst());
   }
 
   @Test
