@@ -22,10 +22,11 @@ java -Xmx4g -jar target/CellServiceLoad-0.0.1-SNAPSHOT.jar --spring.profiles.act
 
 | Setting | Default | |
 |---|---|---|
-| `load.max-clients` | 3000 | ramps up at about 20 clients a second |
+| `load.max-clients` | 3000 | |
+| `load.ramp-up-delay-ms` | 500 | one new client per this many ms: 500 is 2 clients a second, 3000 clients in 25 minutes |
 | `load.phone-share` | 0.7 | the rest are desktops |
 | `load.zoomed-out-share` | 0.15 | clients that zoom out to 0.1-0.4 px per cell and watch up to ~100 blocks |
-| `load.reconnect-threshold-ms` | 1500 | the frontend's watchdog; change it to try another one |
+| `load.reconnect-threshold-ms` | 4000 | the frontend's watchdog; change it to try another one |
 
 ## Bandwidth
 

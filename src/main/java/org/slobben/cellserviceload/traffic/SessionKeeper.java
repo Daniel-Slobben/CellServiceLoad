@@ -92,7 +92,8 @@ public class SessionKeeper {
       start(client, connect(client).get(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS));
       trafficStats.count(TrafficStats.Counter.RECONNECTS);
     } catch (Exception e) {
-      // The watchdog tries again on its next tick, like the frontend.
+      // Like the frontend: wait a whole threshold before the watchdog tries again.
+      client.markServerContact();
       trafficStats.count(TrafficStats.Counter.RECONNECT_FAILURES);
       log.debug("reconnect failed for {}: {}", client.getId(), e.toString());
     } finally {
