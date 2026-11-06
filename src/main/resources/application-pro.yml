@@ -1,2 +1,3 @@
 cell-service:
-  url: dewereldvancellen.nl
+  http-url: https://world-of-cells.net
+  ws-url: wss://world-of-cells.net/ws
