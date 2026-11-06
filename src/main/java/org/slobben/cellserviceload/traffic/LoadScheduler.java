@@ -17,7 +17,6 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class LoadScheduler {
   private static final int MAX_IN_FLIGHT_CONNECTS = 16;
-  private static final int MAX_STARTS_PER_TICK = 4;
 
   private final ClientRegistry clientRegistry;
   private final ServiceApiWrapper serviceApiWrapper;
@@ -41,14 +40,13 @@ public class LoadScheduler {
     return MAX_IN_FLIGHT_CONNECTS - inFlight.availablePermits();
   }
 
-  @Scheduled(fixedDelay = 200)
+  // Starts one client per tick.
+  @Scheduled(fixedDelayString = "${load.ramp-up-delay-ms}")
   public void rampUp() {
-    for (int i = 0; i < MAX_STARTS_PER_TICK; i++) {
-      if (clientRegistry.size() + starting() >= maxClients || !inFlight.tryAcquire()) {
-        return;
-      }
-      virtualThreadExecutor.execute(this::createClient);
+    if (clientRegistry.size() + starting() >= maxClients || !inFlight.tryAcquire()) {
+      return;
     }
+    virtualThreadExecutor.execute(this::createClient);
   }
 
   private void createClient() {
