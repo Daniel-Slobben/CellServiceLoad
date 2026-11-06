@@ -1,31 +1,42 @@
 package org.slobben.cellserviceload.adapter.rest;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.time.Duration;
+import java.util.Objects;
+
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 @Component
-@RequiredArgsConstructor
-@Slf4j
 public class ServiceApiWrapper {
-  private final RestTemplate restTemplate = new RestTemplate();
+  private final RestTemplate restTemplate;
 
-  @Value("${cell-service.url}")
+  @Value("${cell-service.http-url}")
   private String baseUrl;
 
-  public Settings getNewClient() {
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_JSON);
+  public ServiceApiWrapper() {
+    SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+    factory.setConnectTimeout(Duration.ofSeconds(3));
+    factory.setReadTimeout(Duration.ofSeconds(5));
+    this.restTemplate = new RestTemplate(factory);
+  }
 
-    ResponseEntity<Settings> response =
-        restTemplate.getForEntity("https://" + baseUrl + "/gen-api/settings", Settings.class);
-    assert response.getBody() != null;
-    log.info("ClientID: {}", response.getBody().clientId());
-    return response.getBody();
+  public Settings getSettings() {
+    return Objects.requireNonNull(
+        restTemplate.getForObject(baseUrl + "/gen-api/settings", Settings.class));
+  }
+
+  public Coordinates getViewport() {
+    return Objects.requireNonNull(
+        restTemplate.getForObject(baseUrl + "/gen-api/viewport", Coordinates.class));
+  }
+
+  public ReconnectResponse reconnect(String[] visibleBlocks) {
+    return Objects.requireNonNull(
+        restTemplate.postForObject(
+            baseUrl + "/gen-api/reconnect",
+            new ReconnectRequest(visibleBlocks),
+            ReconnectResponse.class));
   }
 }
