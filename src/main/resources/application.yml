@@ -5,4 +5,14 @@ server:
   port: 8085
 
 cell-service:
-  url: localhost:8080
+  http-url: http://localhost:8080
+  ws-url: ws://localhost:8080/ws
+
+load:
+  max-clients: 2000
+  # one new client per this many ms: 500 is 2 clients a second
+  ramp-up-delay-ms: 500
+  phone-share: 0.7
+  zoomed-out-share: 0.15
+  # the frontend reconnects after this long without a message from the server
+  reconnect-threshold-ms: 4000
