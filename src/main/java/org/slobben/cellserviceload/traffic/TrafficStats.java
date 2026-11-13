@@ -23,7 +23,7 @@ public class TrafficStats {
     BORDER_BLOCKS,
     // gaps the frontend's watchdog would have reconnected on
     SLOW_FRAME_GAPS,
-    SESSIONS_DEAD,
+    NO_BLOCKS,
     RECONNECTS,
     RECONNECT_FAILURES,
     CONNECT_FAILURES
@@ -31,9 +31,9 @@ public class TrafficStats {
 
   // Time between block frames per client: the server tick as a user sees it, reconnects included.
   private final LatencyHistogram frameGaps = new LatencyHistogram();
-  private final LatencyHistogram healthAckRtt = new LatencyHistogram();
   private final LatencyHistogram settingsLatency = new LatencyHistogram();
   private final LatencyHistogram viewportLatency = new LatencyHistogram();
+  // From starting a new socket to its STOMP session being connected.
   private final LatencyHistogram reconnectLatency = new LatencyHistogram();
 
   @Getter(AccessLevel.NONE)

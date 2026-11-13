@@ -52,7 +52,9 @@ public class ViewportMover {
     long now = System.currentTimeMillis();
     for (Client client : clientRegistry.all()) {
       if (client.isReconnecting()
-          || (client.getAction() == Action.IDLE && client.getActionEndsAtMs() > now)) {
+          || (client.getAction() == Action.IDLE
+              && client.getActionEndsAtMs() > now
+              && !client.isNoBlocks())) {
         continue;
       }
       virtualThreadExecutor.execute(
@@ -63,7 +65,7 @@ public class ViewportMover {
             try {
               step(client, now);
             } catch (RuntimeException e) {
-              log.warn("move failed for {}: {}", client.getId(), e.toString());
+              log.warn("move failed: {}", e.toString());
             } finally {
               client.getLock().unlock();
             }
@@ -76,6 +78,13 @@ public class ViewportMover {
     client.setLastMoveAtMs(now);
     Camera camera = client.getCamera();
 
+    if (client.isNoBlocks()) {
+      client.setNoBlocks(false);
+      jump(client);
+      idle(client, now);
+      publish(client);
+      return;
+    }
     switch (client.getAction()) {
       case IDLE -> startNextAction(client, now);
       case PAN -> camera.pan(client.getPanVelocityX() * seconds, client.getPanVelocityY() * seconds);
@@ -113,11 +122,16 @@ public class ViewportMover {
       client.setAction(Action.ZOOM);
       client.setActionEndsAtMs(now + ZOOM_MAX_MS);
     } else {
-      // The previous/next button: the frontend centres on a fresh interesting viewport.
-      Coordinates viewport = trafficStats.getViewportLatency().time(serviceApiWrapper::getViewport);
-      client.getCamera().centerOn(viewport.x(), viewport.y());
+      // The previous/next button
+      jump(client);
       idle(client, now);
     }
+  }
+
+  // The frontend centres on a fresh interesting viewport.
+  private void jump(Client client) {
+    Coordinates viewport = trafficStats.getViewportLatency().time(serviceApiWrapper::getViewport);
+    client.getCamera().centerOn(viewport.x(), viewport.y());
   }
 
   // Log-uniform, so zooming in and out are equally likely around the default.
