@@ -6,7 +6,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Component;
 
-// Keyed by instance: a client's id changes on every reconnect.
 @Component
 public class ClientRegistry {
   private final Set<Client> clients = ConcurrentHashMap.newKeySet();

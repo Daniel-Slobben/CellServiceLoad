@@ -1,7 +1,6 @@
 package org.slobben.cellserviceload.adapter.websocket;
 
 import java.lang.reflect.Type;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import lombok.extern.slf4j.Slf4j;
@@ -17,23 +16,22 @@ import org.springframework.web.socket.messaging.WebSocketStompClient;
 @Slf4j
 public class WebSocketClientConnection {
 
-  private final UUID clientId;
   private final StompSession session;
 
-  private WebSocketClientConnection(UUID clientId, StompSession session) {
-    this.clientId = clientId;
+  private WebSocketClientConnection(StompSession session) {
     this.session = session;
   }
 
+  // Each connection is a new client on the server.
   public static CompletableFuture<WebSocketClientConnection> connect(
-      WebSocketStompClient stompClient, UUID clientId, String wsUrl, TopicListener listener) {
+      WebSocketStompClient stompClient, String wsUrl, TopicListener listener) {
     return stompClient
         .connectAsync(wsUrl, new StompSessionHandlerAdapter() {})
         .thenApply(
             session -> {
-              // Block frames and health check responses share this topic; the content type tells them apart.
-              session.subscribe("/topic/" + clientId, topicHandler(listener));
-              return new WebSocketClientConnection(clientId, session);
+              // Block frames and status responses share this queue; the content type tells them apart.
+              session.subscribe("/user/queue/blocks", topicHandler(listener));
+              return new WebSocketClientConnection(session);
             });
   }
 
@@ -41,7 +39,7 @@ public class WebSocketClientConnection {
     return new StompFrameHandler() {
       @Override
       public @NonNull Type getPayloadType(@NonNull StompHeaders headers) {
-        return isBinary(headers) ? byte[].class : HealthCheckResponse.class;
+        return isBinary(headers) ? byte[].class : StatusResponse.class;
       }
 
       @Override
@@ -54,10 +52,11 @@ public class WebSocketClientConnection {
           } catch (IllegalArgumentException e) {
             log.warn("dropping malformed block frame: {}", e.getMessage());
           }
-        } else if (payload instanceof HealthCheckResponse response) {
-          listener.onHealthCheck(response.type());
+        } else if (payload instanceof StatusResponse response
+            && response.type() == StatusResponse.Type.NO_BLOCKS) {
+          listener.onNoBlocks();
         } else {
-          log.warn("unexpected message on the block topic: {}", payload);
+          log.warn("unexpected message on the block queue: {}", payload);
         }
       }
     };
@@ -71,12 +70,7 @@ public class WebSocketClientConnection {
   // Sends on a closed session are dropped; a reconnect resends the whole view anyway.
   public void sendClientUpdateRequest(String[] blocksToRemove, String[] blocksToAdd) {
     if (!session.isConnected()) return;
-    session.send("/client-update", new ClientUpdateRequest(clientId, blocksToRemove, blocksToAdd));
-  }
-
-  public void sendHealthCheck() {
-    if (!session.isConnected()) return;
-    session.send("/health-check", clientId);
+    session.send("/client-update", new ClientUpdateRequest(blocksToRemove, blocksToAdd));
   }
 
   public void disconnect() {

@@ -56,7 +56,6 @@ public class LoadScheduler {
       Device device = rng.nextDouble() < phoneShare ? Device.PHONE : Device.DESKTOP;
       Client client =
           new Client(
-              settings.clientId(),
               new Camera(device, settings.blockSize()),
               rng.nextDouble() < zoomedOutShare,
               trafficStats);
@@ -69,7 +68,7 @@ public class LoadScheduler {
                 try {
                   if (error != null) {
                     trafficStats.count(TrafficStats.Counter.CONNECT_FAILURES);
-                    log.warn("connect failed for {}: {}", client.getId(), error.toString());
+                    log.warn("connect failed: {}", error.toString());
                     return;
                   }
                   sessionKeeper.start(client, connection);

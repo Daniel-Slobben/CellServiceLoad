@@ -70,17 +70,16 @@ public class TrafficReporter {
         trafficStats.getReconnectThresholdMs(),
         counts.get(SLOW_FRAME_GAPS));
     log.info(
-        "sessions: health ack ms {}, sessionsDead={} reconnects={} reconnectFailures={} connectFailures={}",
-        trafficStats.getHealthAckRtt().swap(),
-        counts.get(SESSIONS_DEAD),
+        "sessions: reconnect ms {}, reconnects={} reconnectFailures={} connectFailures={} noBlocks={}",
+        trafficStats.getReconnectLatency().swap(),
         counts.get(RECONNECTS),
         counts.get(RECONNECT_FAILURES),
-        counts.get(CONNECT_FAILURES));
+        counts.get(CONNECT_FAILURES),
+        counts.get(NO_BLOCKS));
     log.info(
-        "rest ms: settings {}, viewport {}, reconnect {}",
+        "rest ms: settings {}, viewport {}",
         trafficStats.getSettingsLatency().swap(),
-        trafficStats.getViewportLatency().swap(),
-        trafficStats.getReconnectLatency().swap());
+        trafficStats.getViewportLatency().swap());
   }
 
   private static long perSecond(long count) {
