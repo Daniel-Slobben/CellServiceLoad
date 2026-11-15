@@ -14,7 +14,7 @@ import org.springframework.web.socket.messaging.WebSocketStompClient;
 
 /**
  * Keeps clients connected the way the frontend does: a new socket when the old one closes or the
- * server has been silent for load.reconnect-threshold-ms (the frontend's heartbeat check). Each
+ * server has been silent for the run's watchdog threshold (the frontend's heartbeat check). Each
  * connection is a new client on the server, so it starts by sending the whole view.
  */
 @Component
@@ -34,10 +34,6 @@ public class SessionKeeper {
   @Value("${cell-service.ws-url}")
   private String wsUrl;
 
-  // The frontend's heartbeat check; change it to try out another one.
-  @Value("${load.reconnect-threshold-ms}")
-  private long reconnectThresholdMs;
-
   public CompletableFuture<WebSocketClientConnection> connect(Client client) {
     return WebSocketClientConnection.connect(
         webSocketStompClient, wsUrl, client.newConnectionListener());
@@ -53,6 +49,7 @@ public class SessionKeeper {
   @Scheduled(fixedDelay = 250)
   public void watchdog() {
     long now = System.currentTimeMillis();
+    long reconnectThresholdMs = trafficStats.getReconnectThresholdMs();
     for (Client client : clientRegistry.all()) {
       boolean closed = !client.getConnection().isConnected();
       boolean silent = client.getLastServerContactMs() < now - reconnectThresholdMs;
@@ -72,6 +69,9 @@ public class SessionKeeper {
   private void reconnect(Client client) {
     client.getLock().lock();
     try {
+      if (client.isClosed()) {
+        return;
+      }
       client.getConnection().disconnect();
       WebSocketClientConnection connection =
           trafficStats

@@ -4,7 +4,7 @@ Simulates many browsers on the Cells backend. Each client behaves like the Angul
 `GET /gen-api/settings`, then its own STOMP websocket on `/ws`, subscribed to `/user/queue/blocks`,
 with its visible blocks sent to `/client-update`. On the server one socket is one client. A client
 opens a new socket when its socket closes or the server is silent for
-`load.reconnect-threshold-ms`, retrying after 1, 2, 4 and 8 s. Every new socket is a new client to the
+the run's watchdog threshold, retrying after 1, 2, 4 and 8 s. Every new socket is a new client to the
 server, so it sends the whole view again and gets it back as FULL blocks. Clients pan, zoom (down to
 0.1 px per cell) and jump to `POST /gen-api/viewport` with phone or desktop screen sizes, and also jump
 when the server answers `NO_BLOCKS`.
@@ -12,21 +12,32 @@ when the server answers `NO_BLOCKS`.
 ## Running
 
 ```bash
-./mvnw spring-boot:run                                              # against localhost:8080
-./mvnw spring-boot:run -Dspring-boot.run.arguments="--spring.profiles.active=pro --load.max-clients=500"
+./mvnw spring-boot:run                                                   # against localhost:8080
+./mvnw spring-boot:run -Dspring-boot.run.arguments="--spring.profiles.active=pro"
 ```
 
-Or as a jar, for running on another machine:
+Then open http://localhost:8085. The page starts and stops runs, and changes a run while it goes:
+more or fewer clients, a faster build-up, another watchdog. It charts each run per 10 s window,
+keeps the last 20 runs until the load test restarts, compares a run with an earlier one, and
+downloads a run as JSON. The target is set at startup and shown at the top; the page asks before
+starting a run against anything other than localhost.
+
+Or as a jar, for running on another machine. Open the page on that machine's port 8085, or start
+a run right away without it:
 
 ```bash
 ./mvnw package -DskipTests
-java -Xmx4g -jar target/CellServiceLoad-0.0.1-SNAPSHOT.jar --spring.profiles.active=pro --load.max-clients=2000
+java -Xmx4g -jar target/CellServiceLoad-0.0.1-SNAPSHOT.jar --spring.profiles.active=pro --load.autostart=true --load.max-clients=2000
 ```
+
+The settings are the page's defaults:
 
 | Setting | Default | |
 |---|---|---|
+| `load.autostart` | false | start a run with these settings at startup |
 | `load.max-clients` | 2000 | |
-| `load.ramp-up-delay-ms` | 500 | one new client per this many ms: 500 is 2 clients a second, 2000 clients in 17 minutes |
+| `load.ramp-up-per-second` | 2 | new clients a second: 2000 clients in 17 minutes |
+| `load.duration-minutes` | 0 | stop the run after this long; 0 runs until stopped |
 | `load.phone-share` | 0.7 | the rest are desktops |
 | `load.zoomed-out-share` | 0.15 | clients that zoom out to 0.1-0.4 px per cell and watch up to ~100 blocks |
 | `load.reconnect-threshold-ms` | 4000 | the frontend's watchdog; change it to try another one |
@@ -42,7 +53,8 @@ fewer clients. A phone on the same Wi-Fi suffers too, so check the site on mobil
 
 ## Report
 
-Every 10 seconds, with counts for those 10 seconds (made-up numbers):
+Logged every 10 seconds of a run, with counts for those 10 seconds (made-up numbers). The page charts
+the same numbers:
 
 ```
 ===== 2m30s ===== clients=590 socketsOpen=588 reconnecting=2 starting=1 stuck=3 | zoomedOut=70 blocksWatched avg=9 max=96

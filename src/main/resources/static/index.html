@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cells Load Test</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 3 3'%3E%3Cpath fill='%232a78d6' d='M1 0h1v1H1zM2 1h1v1H2zM0 2h3v1H0z'/%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f3f2ee;
+    --surface: #fcfcfb;
+    --surface-2: #f0efec;
+    --line: #e2e1dc;
+    --grid: #ecebe7;
+    --text: #0b0b0b;
+    --text-2: #52514e;
+    --text-3: #85847f;
+    --s1: #2a78d6;
+    --s2: #eb6834;
+    --s3: #1baf7a;
+    --good: #0ca30c;
+    --warning: #b47a00;
+    --critical: #d03b3b;
+    --accent-ink: #fff;
+    --cell: rgba(42, 120, 214, .07);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #111110;
+      --surface: #1a1a19;
+      --surface-2: #232321;
+      --line: #2e2e2b;
+      --grid: #262624;
+      --text: #f0efec;
+      --text-2: #c3c2b7;
+      --text-3: #8d8c85;
+      --s1: #3987e5;
+      --s2: #d95926;
+      --s3: #199e70;
+      --warning: #fab219;
+      --critical: #e66767;
+      --cell: rgba(57, 135, 229, .08);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #111110;
+    --surface: #1a1a19;
+    --surface-2: #232321;
+    --line: #2e2e2b;
+    --grid: #262624;
+    --text: #f0efec;
+    --text-2: #c3c2b7;
+    --text-3: #8d8c85;
+    --s1: #3987e5;
+    --s2: #d95926;
+    --s3: #199e70;
+    --warning: #fab219;
+    --critical: #e66767;
+    --cell: rgba(57, 135, 229, .08);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .num, input[type=number], .tile b { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+  button, input, select { font: inherit; color: inherit; }
+
+  header {
+    background:
+      linear-gradient(var(--bg) 0 0) bottom / 100% 1px no-repeat,
+      repeating-linear-gradient(0deg, transparent 0 15px, var(--cell) 15px 16px),
+      repeating-linear-gradient(90deg, transparent 0 15px, var(--cell) 15px 16px);
+    border-bottom: 1px solid var(--line);
+  }
+  .bar { max-width: 1440px; margin: 0 auto; padding: 18px 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .logo { display: grid; grid-template-columns: repeat(3, 8px); gap: 2px; }
+  .logo i { width: 8px; height: 8px; border-radius: 1.5px; background: var(--line); }
+  .logo i.on { background: var(--s1); }
+  h1 { font-size: 18px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+  h1 span { color: var(--text-3); font-weight: 500; }
+  .target { display: flex; gap: 8px; align-items: center; color: var(--text-2); font-size: 13px; }
+  .badge { display: inline-flex; gap: 5px; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--line); background: var(--surface); }
+  .badge.prod { color: var(--critical); border-color: var(--critical); }
+  .spacer { flex: 1; }
+  .status { display: inline-flex; gap: 8px; align-items: center; padding: 6px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-weight: 550; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); }
+  .status.running .dot { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 25%, transparent); }
+  .status.down .dot { background: var(--critical); }
+
+  main { max-width: 1440px; margin: 0 auto; padding: 20px 24px 48px; display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 20px; align-items: start; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+  .card h2 { font-size: 13px; font-weight: 650; margin: 0; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; }
+  .side { position: sticky; top: 16px; padding: 18px; display: grid; gap: 16px; }
+
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+  .chip:hover { border-color: var(--s1); }
+  .field { display: grid; gap: 5px; }
+  .field label { display: flex; justify-content: space-between; font-weight: 550; }
+  .field label output { font-weight: 500; color: var(--text-2); }
+  .field .hint { font-size: 12px; color: var(--text-3); min-height: 1em; }
+  .pair { display: grid; grid-template-columns: 1fr 96px; gap: 10px; align-items: center; }
+  .unit { position: relative; }
+  .unit input { padding-right: 34px; }
+  .unit::after { content: attr(data-unit); position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text-3); font-size: 12px; pointer-events: none; }
+  input[type=number] { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+  input[type=number]:focus, select:focus, button:focus-visible { outline: 2px solid var(--s1); outline-offset: 1px; }
+  input[type=range] { width: 100%; accent-color: var(--s1); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .actions { display: flex; gap: 8px; }
+  .btn { flex: 1; padding: 9px 12px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface-2); font-weight: 600; cursor: pointer; }
+  .btn.primary { background: var(--s1); border-color: var(--s1); color: var(--accent-ink); }
+  .btn.danger { color: var(--critical); border-color: color-mix(in srgb, var(--critical) 45%, var(--line)); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .error { color: var(--critical); font-size: 13px; min-height: 1em; margin: 0; }
+
+  .content { display: grid; gap: 20px; min-width: 0; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .tile { padding: 14px 16px; display: grid; gap: 2px; }
+  .tile span { color: var(--text-2); font-size: 12px; font-weight: 550; }
+  .tile b { font-size: 26px; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
+  .tile b small { font-size: 14px; color: var(--text-3); font-weight: 500; }
+  .tile em { font-style: normal; color: var(--text-3); font-size: 12px; }
+  .tile .warn { color: var(--critical); }
+  .progress { height: 4px; border-radius: 2px; background: var(--surface-2); margin-top: 6px; overflow: hidden; }
+  .progress i { display: block; height: 100%; background: var(--s1); border-radius: 2px; }
+
+  .viewbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .viewbar h2 { margin-right: auto; }
+  .viewbar label { color: var(--text-2); font-size: 13px; display: flex; gap: 6px; align-items: center; }
+  select { padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+
+  .charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 12px; }
+  .chart { padding: 14px 14px 8px; position: relative; }
+  .chart header { all: unset; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .chart h3 { margin: 0; font-size: 14px; font-weight: 650; }
+  .chart h3 small { color: var(--text-3); font-weight: 500; margin-left: 4px; }
+  .legend { display: flex; gap: 10px; font-size: 12px; color: var(--text-2); flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+  .chart svg { display: block; width: 100%; height: 180px; margin-top: 8px; touch-action: none; }
+  .chart svg text { fill: var(--text-3); font-size: 11px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .empty { height: 180px; display: grid; place-items: center; color: var(--text-3); margin-top: 8px; font-size: 13px; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); display: none; z-index: 2; min-width: 140px; }
+  .tip .t { color: var(--text-3); margin-bottom: 4px; }
+  .tip div { display: flex; gap: 8px; align-items: center; white-space: nowrap; }
+  .tip i { width: 8px; height: 8px; border-radius: 2px; }
+  .tip strong { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 600; }
+  .tip .was { color: var(--text-3); }
+
+  .history { padding: 16px 18px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+  th { text-align: right; color: var(--text-3); font-weight: 550; font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { text-align: right; padding: 7px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th:first-child, td:first-child, th.l, td.l { text-align: left; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--surface-2); }
+  tbody tr.viewing { box-shadow: inset 3px 0 0 var(--s1); }
+  td a { color: var(--s1); text-decoration: none; }
+  .muted { color: var(--text-3); }
+
+  .banner { display: none; max-width: 1440px; margin: 12px auto 0; padding: 0 24px; }
+  .banner p { margin: 0; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--critical); color: var(--critical); background: var(--surface); }
+
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; padding: 16px; }
+    .bar { padding: 14px 16px; }
+    .side { position: static; }
+    .charts { grid-template-columns: 1fr; }
+    .banner { padding: 0 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="logo" aria-hidden="true"><i></i><i class="on"></i><i></i><i></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+    <h1>World of Cells <span>load test</span></h1>
+    <div class="target"><span>target</span><span id="target" class="badge num">…</span></div>
+    <div class="spacer"></div>
+    <div id="status" class="status"><span class="dot"></span><span id="statusText">Connecting…</span></div>
+  </div>
+</header>
+<div id="banner" class="banner"><p>The load test on this port isn't answering. Is <span class="num">./mvnw spring-boot:run</span> still going?</p></div>
+
+<main>
+  <form id="form" class="card side" autocomplete="off">
+    <h2>Run</h2>
+    <div class="presets" id="presets"></div>
+
+    <div class="field">
+      <label for="clients">Clients</label>
+      <div class="pair">
+        <input type="range" id="clientsRange" min="0" max="5000" step="50">
+        <input type="number" id="clients" min="0" max="20000" step="1" required>
+      </div>
+      <div class="hint" id="clientsHint"></div>
+    </div>
+
+    <div class="field">
+      <label for="rampUpPerSecond">Build-up</label>
+      <div class="unit" data-unit="/s"><input type="number" id="rampUpPerSecond" min="0.1" max="200" step="0.1" required></div>
+      <div class="hint" id="rampHint"></div>
+    </div>
+
+    <div class="field">
+      <label for="durationMinutes">Duration</label>
+      <div class="unit" data-unit="min"><input type="number" id="durationMinutes" min="0" step="1" required></div>
+      <div class="hint" id="durationHint"></div>
+    </div>
+
+    <div class="row2">
+      <div class="field">
+        <label for="phoneShare">Phones <output id="phoneOut"></output></label>
+        <input type="range" id="phoneShare" min="0" max="1" step="0.05">
+      </div>
+      <div class="field">
+        <label for="zoomedOutShare">Zoomed out <output id="zoomOut"></output></label>
+        <input type="range" id="zoomedOutShare" min="0" max="1" step="0.05">
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="reconnectThresholdMs">Watchdog</label>
+      <div class="unit" data-unit="ms"><input type="number" id="reconnectThresholdMs" min="500" step="100" required></div>
+      <div class="hint">Reconnect after this much silence; the frontend uses 4000.</div>
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn primary" id="startBtn">Start run</button>
+      <button type="button" class="btn" id="applyBtn" hidden>Apply changes</button>
+      <button type="button" class="btn danger" id="stopBtn" hidden>Stop</button>
+    </div>
+    <p class="error" id="error" role="alert"></p>
+  </form>
+
+  <div class="content">
+    <section class="tiles" id="tiles"></section>
+
+    <div class="viewbar">
+      <h2 id="viewTitle">No runs yet</h2>
+      <label>Compare with <select id="compare"><option value="">nothing</option></select></label>
+      <button type="button" class="chip" id="liveBtn" hidden>Back to the latest run</button>
+    </div>
+    <section class="charts" id="charts"></section>
+
+    <section class="card history">
+      <h2>Runs</h2>
+      <table>
+        <thead><tr>
+          <th>Run</th><th class="l">Started</th><th>Length</th><th>Clients</th><th>Build-up</th>
+          <th>Peak running</th><th>Peak MB/s</th><th>Worst p95 gap</th><th>Most stuck</th><th>Reconnects</th><th class="l">End</th><th></th>
+        </tr></thead>
+        <tbody id="runsBody"><tr><td colspan="12" class="muted">Runs show here; they're kept until the load test restarts.</td></tr></tbody>
+      </table>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const FIELDS = ['clients', 'rampUpPerSecond', 'durationMinutes', 'phoneShare', 'zoomedOutShare', 'reconnectThresholdMs'];
+const PRESETS = [
+  { name: 'Smoke', config: { clients: 50, rampUpPerSecond: 10, durationMinutes: 2 } },
+  { name: 'Build-up', config: { clients: 2000, rampUpPerSecond: 2, durationMinutes: 0 } },
+  { name: 'Spike', config: { clients: 1000, rampUpPerSecond: 50, durationMinutes: 5 } },
+  { name: 'Soak', config: { clients: 500, rampUpPerSecond: 5, durationMinutes: 60 } },
+];
+
+let setup = null;
+let runs = [];          // newest first, as the server keeps them
+let liveId = null;      // the run that is going, if any
+let viewId = null;      // null follows the latest run
+let compareId = null;
+let formDirty = false;
+let reachable = true;
+
+// ---------- formatting ----------
+const int = v => Math.round(v).toLocaleString('en-US').replace(/,/g, ' ');
+const dec = (v, d = 1) => v.toFixed(d);
+function dur(s) {
+  s = Math.max(0, Math.round(s));
+  const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = s % 60;
+  if (h) return `${h}h ${String(m).padStart(2, '0')}m`;
+  return m ? `${m}m ${String(sec).padStart(2, '0')}s` : `${sec}s`;
+}
+const clock = ms => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const perSec = (n, r) => n / r.seconds;
+const mbps = (bytes, r) => bytes / r.seconds / (1024 * 1024);
+const lat = (s, key) => s.count ? s[key] : null;
+
+// ---------- api ----------
+async function api(path, body) {
+  const res = await fetch('/api/' + path, body === undefined ? {} : {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error((await res.text()) || res.statusText);
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+// ---------- form ----------
+function readForm() {
+  const c = {};
+  for (const f of FIELDS) c[f] = Number($(f).value);
+  return c;
+}
+function writeForm(c) {
+  for (const f of FIELDS) if (c[f] !== undefined) $(f).value = c[f];
+  $('clientsRange').value = Math.min(c.clients ?? $('clients').value, 5000);
+  formDirty = false;
+  updateHints();
+}
+function sameConfig(a, b) { return a && b && FIELDS.every(f => Number(a[f]) === Number(b[f])); }
+
+function updateHints() {
+  const c = readForm();
+  $('phoneOut').textContent = `${Math.round(c.phoneShare * 100)}%`;
+  $('zoomOut').textContent = `${Math.round(c.zoomedOutShare * 100)}%`;
+  $('clientsHint').textContent = `${int(c.clients * c.phoneShare)} phones, ${int(c.clients * (1 - c.phoneShare))} desktops`;
+  $('rampHint').textContent = c.rampUpPerSecond > 0 ? `Clients a second: all ${int(c.clients)} in ${dur(c.clients / c.rampUpPerSecond)}` : '';
+  const live = liveRun();
+  const startMs = live ? live.startedAtMs : Date.now();
+  $('durationHint').textContent = c.durationMinutes > 0 ? `Ends at ${clock(startMs + c.durationMinutes * 60000)}; 0 runs until stopped.` : 'Runs until stopped.';
+  const running = !!live;
+  $('startBtn').hidden = running;
+  $('applyBtn').hidden = !running;
+  $('stopBtn').hidden = !running;
+  $('applyBtn').disabled = !running || sameConfig(c, live.config);
+}
+
+function isProduction() {
+  return setup && !/\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(setup.httpUrl);
+}
+
+async function act(fn) {
+  $('error').textContent = '';
+  try { await fn(); await loadRuns(); } catch (e) { $('error').textContent = e.message; }
+}
+
+$('form').addEventListener('submit', e => {
+  e.preventDefault();
+  if (isProduction() && !confirm(`This runs ${readForm().clients} clients against ${setup.httpUrl}. Go?`)) return;
+  act(() => api('start', readForm()).then(() => { viewId = null; formDirty = false; }));
+});
+$('applyBtn').addEventListener('click', () => act(() => api('update', readForm())));
+$('stopBtn').addEventListener('click', () => act(() => api('stop', {})));
+$('form').addEventListener('input', e => {
+  if (e.target.id === 'clientsRange') $('clients').value = e.target.value;
+  if (e.target.id === 'clients') $('clientsRange').value = Math.min(e.target.value, 5000);
+  formDirty = true;
+  updateHints();
+});
+for (const p of PRESETS) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'chip'; b.textContent = p.name;
+  b.title = `${p.config.clients} clients, ${p.config.rampUpPerSecond}/s, ${p.config.durationMinutes ? p.config.durationMinutes + ' min' : 'until stopped'}`;
+  b.addEventListener('click', () => { writeForm({ ...readForm(), ...p.config }); formDirty = true; updateHints(); });
+  $('presets').appendChild(b);
+}
+
+// ---------- runs ----------
+const liveRun = () => runs.find(r => r.id === liveId && r.running) || null;
+const viewedRun = () => runs.find(r => r.id === viewId) || runs[0] || null;
+
+async function loadRuns() {
+  runs = await api('runs');
+  const live = runs.find(r => r.running);
+  liveId = live ? live.id : null;
+  if (!formDirty) writeForm(live ? live.config : runs[0] ? runs[0].config : setup.defaults);
+  renderAll();
+}
+
+async function poll() {
+  try {
+    const live = liveRun();
+    const known = live ? live.reports.length : 0;
+    const data = await api(`live?reports=${known}`);
+    setReachable(true);
+    if (data.runId !== liveId) return loadRuns();
+    if (live && data.newReports.length) {
+      live.reports.push(...data.newReports);
+      renderCharts();
+      renderHistory();
+    }
+    renderTiles(data.clients);
+    renderStatus(data.clients);
+  } catch (e) {
+    setReachable(false);
+  }
+}
+
+function setReachable(ok) {
+  if (ok === reachable) return;
+  reachable = ok;
+  $('banner').style.display = ok ? 'none' : 'block';
+  if (!ok) renderStatus(null);
+}
+
+function renderStatus(clients) {
+  const s = $('status'), live = liveRun();
+  s.className = 'status' + (!reachable ? ' down' : live ? ' running' : '');
+  if (!reachable) { $('statusText').textContent = 'Unreachable'; return; }
+  if (!live) { $('statusText').textContent = 'Idle'; return; }
+  const elapsed = dur((Date.now() - live.startedAtMs) / 1000);
+  const n = clients ? clients.clients : 0, target = live.config.clients;
+  const phase = n < target ? `building up ${int(n)} → ${int(target)}` : n > target ? `scaling down to ${int(target)}` : `holding ${int(target)}`;
+  $('statusText').textContent = `Run ${live.id} · ${elapsed} · ${phase}`;
+}
+
+// ---------- tiles ----------
+let lastClients = null;
+function renderTiles(clients) {
+  if (clients) lastClients = clients;
+  const c = lastClients || { clients: 0, open: 0, reconnecting: 0, starting: 0, stuck: 0, zoomedOut: 0, blocksAvg: 0, blocksMax: 0 };
+  const live = liveRun();
+  const target = live ? live.config.clients : 0;
+  const r = live && live.reports.length ? live.reports[live.reports.length - 1] : null;
+  const threshold = live ? live.config.reconnectThresholdMs : setup.defaults.reconnectThresholdMs;
+  const tiles = [
+    { label: 'Running', value: int(c.clients), small: target ? `/ ${int(target)}` : '', sub: `open ${int(c.open)} · starting ${c.starting}`, progress: target ? c.clients / target : 0 },
+    { label: 'Stuck', value: int(c.stuck), warn: c.stuck > 0, sub: `no frame in ${threshold / 1000} s` },
+    { label: 'Reconnecting', value: int(c.reconnecting), sub: `${int(c.zoomedOut)} zoomed out` },
+    { label: 'Download', value: r ? dec(mbps(r.counts.FRAME_BYTES, r), 2) : '–', small: 'MB/s', sub: r && r.clients.clients ? `${int(r.counts.FRAME_BYTES / r.seconds / 1024 / r.clients.clients)} KB/s per client` : 'last 10 s' },
+    { label: 'Frame gap p95', value: r && r.frameGaps.count ? int(r.frameGaps.p95) : '–', small: 'ms', warn: r && r.frameGaps.p95 > threshold, sub: r && r.frameGaps.count ? `p50 ${int(r.frameGaps.p50)} · p99 ${int(r.frameGaps.p99)}` : 'last 10 s' },
+    { label: 'Blocks watched', value: int(c.blocksAvg), small: 'avg', sub: `max ${int(c.blocksMax)}` },
+  ];
+  const host = $('tiles');
+  host.replaceChildren(...tiles.map(t => {
+    const d = document.createElement('div');
+    d.className = 'card tile';
+    const label = document.createElement('span'); label.textContent = t.label;
+    const b = document.createElement('b'); b.textContent = t.value + ' ';
+    if (t.warn) b.className = 'warn';
+    if (t.small) { const sm = document.createElement('small'); sm.textContent = t.small; b.appendChild(sm); }
+    const em = document.createElement('em'); em.textContent = (t.warn ? '▲ ' : '') + t.sub;
+    d.append(label, b, em);
+    if (t.progress !== undefined && target) {
+      const p = document.createElement('div'); p.className = 'progress';
+      const i = document.createElement('i'); i.style.width = Math.min(100, t.progress * 100) + '%';
+      p.appendChild(i); d.appendChild(p);
+    }
+    return d;
+  }));
+}
+
+// ---------- charts ----------
+const COLORS = ['var(--s1)', 'var(--s2)', 'var(--s3)'];
+const CHARTS = [
+  { title: 'Clients', series: [
+      { name: 'running', get: r => r.clients.clients },
+      { name: 'stuck', get: r => r.clients.stuck },
+      { name: 'reconnecting', get: r => r.clients.reconnecting }],
+    ref: run => ({ value: run.config.clients, label: 'target', always: true }), fmt: int },
+  { title: 'Download', unit: 'MB/s', series: [
+      { name: 'full', get: r => mbps(r.counts.FULL_BYTES, r) },
+      { name: 'border', get: r => mbps(r.counts.BORDER_BYTES, r) }], fmt: v => dec(v, 2) },
+  { title: 'Frame gaps', unit: 'ms', series: [
+      { name: 'p50', get: r => lat(r.frameGaps, 'p50') },
+      { name: 'p95', get: r => lat(r.frameGaps, 'p95') },
+      { name: 'p99', get: r => lat(r.frameGaps, 'p99') }],
+    ref: run => ({ value: run.config.reconnectThresholdMs, label: 'watchdog' }), fmt: int },
+  { title: 'Client starts', unit: 'a second', series: [
+      { name: 'started', get: r => perSec(r.counts.CLIENTS_STARTED, r) },
+      { name: 'failed', get: r => perSec(r.counts.START_FAILURES, r) }], fmt: v => dec(v, 1) },
+  { title: 'Reconnects', unit: 'a second', series: [
+      { name: 'closed', get: r => perSec(r.counts.RECONNECTS_CLOSED, r) },
+      { name: 'silent', get: r => perSec(r.counts.RECONNECTS_SILENT, r) },
+      { name: 'retry', get: r => perSec(r.counts.RECONNECTS_RETRY, r) }], fmt: v => dec(v, 1) },
+  { title: 'Latency p95', unit: 'ms', series: [
+      { name: '/settings', get: r => lat(r.settings, 'p95') },
+      { name: '/viewport', get: r => lat(r.viewport, 'p95') },
+      { name: 'reconnect', get: r => lat(r.reconnects, 'p95') }], fmt: int },
+];
+
+const NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function niceStep(x) {
+  if (!(x > 0)) return 1;
+  const p = 10 ** Math.floor(Math.log10(x));
+  return [1, 2, 2.5, 5, 10].find(m => m * p >= x) * p;
+}
+
+function renderCharts() {
+  const run = viewedRun();
+  const cmp = runs.find(r => r.id === compareId && r !== run) || null;
+  const charts = CHARTS.map(def => chart(def, run, cmp));
+  $('charts').replaceChildren(...charts.map(c => c.card));
+  charts.forEach(c => c.draw && c.draw());
+}
+
+function chart(def, run, cmp) {
+  const card = document.createElement('div');
+  card.className = 'card chart';
+  const head = document.createElement('header');
+  const h = document.createElement('h3'); h.textContent = def.title;
+  if (def.unit) { const s = document.createElement('small'); s.textContent = def.unit; h.appendChild(s); }
+  const legend = document.createElement('div'); legend.className = 'legend';
+  def.series.forEach((s, i) => {
+    const l = document.createElement('span');
+    const sw = document.createElement('i'); sw.style.background = COLORS[i];
+    l.append(sw, s.name); legend.appendChild(l);
+  });
+  if (cmp) { const l = document.createElement('span'); l.className = 'muted'; l.textContent = `dashed: run ${cmp.id}`; legend.appendChild(l); }
+  head.append(h, legend);
+  card.appendChild(head);
+
+  if (!run || !run.reports.length) {
+    const e = document.createElement('div'); e.className = 'empty';
+    e.textContent = run && run.running ? 'The first window lands 10 s after the start.' : 'Start a run to see it here.';
+    card.appendChild(e);
+    return { card };
+  }
+  return { card, draw: () => drawChart(card, def, run, cmp) };
+}
+
+function drawChart(card, def, run, cmp) {
+  const W = Math.max(240, card.clientWidth - 28), H = 180;
+  const m = { l: 46, r: 10, t: 8, b: 22 };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const lines = r => def.series.map(s => r.reports.map(rep => ({ x: rep.atS, y: s.get(rep) })));
+  const data = lines(run), cdata = cmp ? lines(cmp) : [];
+  const ref = def.ref ? def.ref(run) : null;
+  const xMax = Math.max(60, ...[run, cmp].filter(Boolean).map(r => r.reports.length ? r.reports[r.reports.length - 1].atS : 0));
+  const ys = [...data, ...cdata].flat().map(p => p.y).filter(v => v != null);
+  let yMax = Math.max(0, ...ys);
+  // A far-off reference line would flatten the data; it then shows only when the data gets close.
+  if (ref && (ref.always || yMax === 0 || ref.value < yMax * 3)) yMax = Math.max(yMax, ref.value);
+  const step = niceStep(yMax / 4 || 1);
+  yMax = Math.max(step, Math.ceil(yMax / step) * step);
+  const X = x => m.l + (x / xMax) * pw;
+  const Y = y => m.t + ph - (y / yMax) * ph;
+
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `${def.title} over time` });
+  for (let v = 0; v <= yMax + step / 2; v += step) {
+    svgEl('line', { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: v === 0 ? 'var(--line)' : 'var(--grid)', 'stroke-width': 1 }, svg);
+    const t = svgEl('text', { x: m.l - 6, y: Y(v) + 4, 'text-anchor': 'end' }, svg);
+    t.textContent = def.fmt(v);
+  }
+  const xStep = [30, 60, 120, 300, 600, 900, 1800, 3600, 7200].find(s => xMax / s <= 6) || 7200;
+  for (let x = 0; x <= xMax; x += xStep) {
+    const t = svgEl('text', { x: X(x), y: H - 6, 'text-anchor': x === 0 ? 'start' : X(x) > W - 40 ? 'end' : 'middle' }, svg);
+    t.textContent = x === 0 ? '0' : dur(x);
+  }
+  if (ref && ref.value <= yMax) {
+    svgEl('line', { x1: m.l, x2: W - m.r, y1: Y(ref.value), y2: Y(ref.value), stroke: 'var(--text-3)', 'stroke-dasharray': '2 3', 'stroke-width': 1 }, svg);
+    const t = svgEl('text', { x: W - m.r, y: Y(ref.value) - 4, 'text-anchor': 'end' }, svg);
+    t.textContent = ref.label;
+  }
+  const path = pts => {
+    let d = '', pen = false;
+    for (const p of pts) {
+      if (p.y == null) { pen = false; continue; }
+      d += `${pen ? 'L' : 'M'}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`;
+      pen = true;
+    }
+    return d;
+  };
+  cdata.forEach((pts, i) => svgEl('path', { d: path(pts), fill: 'none', stroke: COLORS[i], 'stroke-width': 1.5, 'stroke-dasharray': '4 3', opacity: 0.5, 'stroke-linejoin': 'round' }, svg));
+  data.forEach((pts, i) => svgEl('path', { d: path(pts), fill: 'none', stroke: COLORS[i], 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, svg));
+
+  const hair = svgEl('line', { y1: m.t, y2: m.t + ph, stroke: 'var(--text-3)', 'stroke-width': 1, visibility: 'hidden' }, svg);
+  const dots = data.map((_, i) => svgEl('circle', { r: 4, fill: COLORS[i], stroke: 'var(--surface)', 'stroke-width': 2, visibility: 'hidden' }, svg));
+  const tip = document.createElement('div'); tip.className = 'tip';
+  card.append(svg, tip);
+
+  const hide = () => { hair.setAttribute('visibility', 'hidden'); dots.forEach(d => d.setAttribute('visibility', 'hidden')); tip.style.display = 'none'; };
+  svg.addEventListener('pointerleave', hide);
+  svg.addEventListener('pointermove', e => {
+    const box = svg.getBoundingClientRect();
+    const sx = (e.clientX - box.left) * (W / box.width);
+    const atS = ((sx - m.l) / pw) * xMax;
+    const reps = run.reports;
+    let i = 0;
+    for (let k = 1; k < reps.length; k++) if (Math.abs(reps[k].atS - atS) < Math.abs(reps[i].atS - atS)) i = k;
+    const x = X(reps[i].atS);
+    hair.setAttribute('x1', x); hair.setAttribute('x2', x); hair.setAttribute('visibility', 'visible');
+    data.forEach((pts, k) => {
+      const y = pts[i].y;
+      dots[k].setAttribute('visibility', y == null ? 'hidden' : 'visible');
+      if (y != null) { dots[k].setAttribute('cx', x); dots[k].setAttribute('cy', Y(y)); }
+    });
+    const rows = [];
+    const t = document.createElement('div'); t.className = 't'; t.textContent = `${dur(reps[i].atS)} into run ${run.id}`;
+    rows.push(t);
+    def.series.forEach((s, k) => {
+      const row = document.createElement('div');
+      const sw = document.createElement('i'); sw.style.background = COLORS[k];
+      const v = document.createElement('strong'); const y = data[k][i].y;
+      v.textContent = y == null ? '–' : def.fmt(y);
+      row.append(sw, v, s.name);
+      if (cmp && cdata[k][i]) {
+        const was = document.createElement('span'); was.className = 'was';
+        const cy = cdata[k][i].y;
+        was.textContent = `run ${cmp.id}: ${cy == null ? '–' : def.fmt(cy)}`;
+        row.appendChild(was);
+      }
+      rows.push(row);
+    });
+    tip.replaceChildren(...rows);
+    tip.style.display = 'block';
+    const cardBox = card.getBoundingClientRect();
+    const px = box.left - cardBox.left + (x / W) * box.width;
+    tip.style.left = (px + tip.offsetWidth + 16 > card.clientWidth ? px - tip.offsetWidth - 12 : px + 12) + 'px';
+    tip.style.top = box.top - cardBox.top + 8 + 'px';
+  });
+}
+
+// ---------- history ----------
+function summary(run) {
+  const reps = run.reports;
+  const max = f => reps.reduce((m, r) => Math.max(m, f(r) ?? 0), 0);
+  return {
+    length: ((run.endedAtMs || Date.now()) - run.startedAtMs) / 1000,
+    peakClients: max(r => r.clients.clients),
+    peakMbps: max(r => mbps(r.counts.FRAME_BYTES, r)),
+    worstGap: max(r => lat(r.frameGaps, 'p95')),
+    mostStuck: max(r => r.clients.stuck),
+    reconnects: reps.reduce((s, r) => s + r.counts.RECONNECTS_CLOSED + r.counts.RECONNECTS_SILENT + r.counts.RECONNECTS_RETRY, 0),
+  };
+}
+
+function renderHistory() {
+  const body = $('runsBody');
+  if (!runs.length) return;
+  const viewed = viewedRun();
+  body.replaceChildren(...runs.map(run => {
+    const s = summary(run), c = run.config;
+    const tr = document.createElement('tr');
+    if (run === viewed) tr.className = 'viewing';
+    const cells = [
+      `#${run.id}`, clock(run.startedAtMs), dur(s.length), int(c.clients), `${c.rampUpPerSecond}/s`,
+      int(s.peakClients), dec(s.peakMbps, 2), s.worstGap ? `${int(s.worstGap)} ms` : '–', int(s.mostStuck), int(s.reconnects),
+      run.running ? 'going' : run.endReason,
+    ];
+    cells.forEach((v, i) => {
+      const td = document.createElement('td');
+      td.textContent = v;
+      if (i === 1 || i === 10) td.className = 'l' + (run.running && i === 10 ? '' : ' muted');
+      if (i > 1 && i < 10) td.classList.add('num');
+      tr.appendChild(td);
+    });
+    const td = document.createElement('td');
+    const a = document.createElement('a');
+    a.href = '#'; a.textContent = 'JSON';
+    a.title = 'Download this run';
+    a.addEventListener('click', e => {
+      e.preventDefault(); e.stopPropagation();
+      const url = URL.createObjectURL(new Blob([JSON.stringify({ target: setup.httpUrl, ...run }, null, 2)], { type: 'application/json' }));
+      const link = Object.assign(document.createElement('a'), { href: url, download: `load-run-${run.id}.json` });
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+    td.appendChild(a);
+    tr.appendChild(td);
+    tr.addEventListener('click', () => { viewId = run.id === runs[0].id ? null : run.id; if (compareId === run.id) compareId = null; renderAll(); });
+    return tr;
+  }));
+}
+
+function renderView() {
+  const run = viewedRun();
+  $('viewTitle').textContent = !run ? 'No runs yet' : `Run ${run.id}${run.running ? ', live' : ''} · ${int(run.config.clients)} clients at ${run.config.rampUpPerSecond}/s`;
+  $('liveBtn').hidden = viewId === null;
+  const sel = $('compare');
+  const options = runs.filter(r => r !== run);
+  if (!options.some(r => r.id === compareId)) compareId = null;
+  sel.replaceChildren(new Option('nothing', ''), ...options.map(r => new Option(`run ${r.id} · ${int(r.config.clients)} clients · ${clock(r.startedAtMs)}`, r.id)));
+  sel.value = compareId ?? '';
+  sel.disabled = !options.length;
+}
+$('compare').addEventListener('change', e => { compareId = e.target.value ? Number(e.target.value) : null; renderCharts(); });
+$('liveBtn').addEventListener('click', () => { viewId = null; renderAll(); });
+
+function renderAll() {
+  renderView();
+  renderCharts();
+  renderHistory();
+  renderTiles();
+  renderStatus(lastClients);
+  updateHints();
+}
+
+let resizeTimer;
+window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderCharts, 150); });
+
+(async function init() {
+  try {
+    setup = await api('setup');
+  } catch (e) {
+    setReachable(false);
+    setTimeout(init, 2000);
+    return;
+  }
+  $('target').textContent = setup.httpUrl.replace(/^https?:\/\//, '');
+  if (isProduction()) {
+    $('target').classList.add('prod');
+    $('target').textContent = '⚠ ' + $('target').textContent + ' · production';
+  }
+  await loadRuns();
+  poll();
+  setInterval(poll, 1000);
+})();
+</script>
+</body>
+</html>
