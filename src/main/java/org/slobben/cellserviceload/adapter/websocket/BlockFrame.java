@@ -14,7 +14,7 @@ import java.nio.ByteOrder;
  *  8      u8    type (0 = FULL, 1 = BORDER)
  *  9      u32   generation
  * 13      u32   encodedCells length
- * 17      ...   encodedCells (zstd frame)
+ * 17      ...   encodedCells (zstd frame; FULL: the copied rows and runs of strips, see the backend's Packer)
  * </pre>
  *
  * Only the headers are read; the load test never decompresses cells.
