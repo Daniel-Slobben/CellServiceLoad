@@ -14,7 +14,7 @@ import org.slobben.cellserviceload.adapter.websocket.WebSocketClientConnection;
 public class Client {
   private final Camera camera;
   // Some users zoom all the way out; they watch many more blocks.
-  private final boolean zoomsOut;
+  @Setter private volatile boolean zoomsOut;
   private final TrafficStats stats;
   private final ReentrantLock lock = new ReentrantLock();
   private final Set<String> blocksInView = new HashSet<>();

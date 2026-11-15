@@ -11,7 +11,7 @@ public class Camera {
   static final double MIN_CELL_SIZE = 0.1;
   static final double MAX_CELL_SIZE = 30;
 
-  private final Device device;
+  private Device device;
   private final int blockSize;
   private double cellSize = DEFAULT_CELL_SIZE;
   private double cellOffsetX;
@@ -28,6 +28,14 @@ public class Camera {
 
   public Device device() {
     return device;
+  }
+
+  /** Another screen size around the same centre, like resizing the window. */
+  public void setDevice(Device device) {
+    double centerX = cellOffsetX + (this.device.width / cellSize) / 2;
+    double centerY = cellOffsetY + (this.device.height / cellSize) / 2;
+    this.device = device;
+    centerOn(centerX, centerY);
   }
 
   public void centerOn(double worldX, double worldY) {

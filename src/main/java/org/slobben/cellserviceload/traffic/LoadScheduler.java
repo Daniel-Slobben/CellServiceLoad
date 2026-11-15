@@ -1,12 +1,14 @@
 package org.slobben.cellserviceload.traffic;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Predicate;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +33,7 @@ public class LoadScheduler {
   private final ClientRegistry clientRegistry;
   private final ServiceApiWrapper serviceApiWrapper;
   private final SessionKeeper sessionKeeper;
+  private final ViewportMover viewportMover;
   private final Executor virtualThreadExecutor;
   private final TrafficStats trafficStats;
 
@@ -114,8 +117,39 @@ public class LoadScheduler {
     }
     run.setConfig(config);
     trafficStats.setReconnectThresholdMs(config.reconnectThresholdMs());
+    changeMix(config);
     log.info("Run {} changed: {}", run.getId(), config);
     return run;
+  }
+
+  // Switches just enough running clients to another device or kind of user to match the new shares.
+  private void changeMix(RunConfig config) {
+    Collection<Client> clients = clientRegistry.all();
+    if (clients.isEmpty()) {
+      return;
+    }
+    double phones = share(clients, client -> client.getCamera().device() == Device.PHONE);
+    double zoomers = share(clients, Client::isZoomsOut);
+    ThreadLocalRandom rng = ThreadLocalRandom.current();
+    for (Client client : clients) {
+      boolean phone = client.getCamera().device() == Device.PHONE;
+      boolean newPhone = phone != switches(phone, phones, config.phoneShare(), rng);
+      boolean newZoomsOut = client.isZoomsOut() != switches(client.isZoomsOut(), zoomers, config.zoomedOutShare(), rng);
+      if (newPhone != phone || newZoomsOut != client.isZoomsOut()) {
+        Device device = newPhone ? Device.PHONE : Device.DESKTOP;
+        virtualThreadExecutor.execute(() -> viewportMover.change(client, device, newZoomsOut));
+      }
+    }
+  }
+
+  private static double share(Collection<Client> clients, Predicate<Client> kind) {
+    return clients.stream().filter(kind).count() / (double) clients.size();
+  }
+
+  // The kind there is too much of switches with the chance that brings its share to the wanted one.
+  private static boolean switches(boolean is, double share, double wanted, ThreadLocalRandom rng) {
+    double chance = is ? (share - wanted) / share : (wanted - share) / (1 - share);
+    return rng.nextDouble() < chance;
   }
 
   public synchronized void stop(String reason) {

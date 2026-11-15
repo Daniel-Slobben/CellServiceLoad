@@ -110,7 +110,8 @@
   .unit { position: relative; }
   .unit input { padding-right: 34px; }
   .unit::after { content: attr(data-unit); position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text-3); font-size: 12px; pointer-events: none; }
-  input[type=number] { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+  input[type=number] { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); appearance: textfield; -moz-appearance: textfield; }
+  input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   input[type=number]:focus, select:focus, button:focus-visible { outline: 2px solid var(--s1); outline-offset: 1px; }
   input[type=range] { width: 100%; accent-color: var(--s1); }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -225,6 +226,7 @@
         <input type="range" id="zoomedOutShare" min="0" max="1" step="0.05">
       </div>
     </div>
+    <div class="field"><div class="hint" style="margin-top: -10px">Changing these during a run switches running clients over.</div></div>
 
     <div class="field">
       <label for="reconnectThresholdMs">Watchdog</label>
@@ -339,18 +341,24 @@ function isProduction() {
   return setup && !/\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(setup.httpUrl);
 }
 
-async function act(fn) {
+async function act(button, busyText, fn) {
   $('error').textContent = '';
+  const text = button.textContent;
+  button.disabled = true;
+  button.textContent = busyText;
   try { await fn(); await loadRuns(); } catch (e) { $('error').textContent = e.message; }
+  button.textContent = text;
+  button.disabled = false;
+  updateHints();
 }
 
 $('form').addEventListener('submit', e => {
   e.preventDefault();
   if (isProduction() && !confirm(`This runs ${readForm().clients} clients against ${setup.httpUrl}. Go?`)) return;
-  act(() => api('start', readForm()).then(() => { viewId = null; formDirty = false; }));
+  act($('startBtn'), 'Starting…', () => api('start', readForm()).then(() => { viewId = null; formDirty = false; }));
 });
-$('applyBtn').addEventListener('click', () => act(() => api('update', readForm())));
-$('stopBtn').addEventListener('click', () => act(() => api('stop', {})));
+$('applyBtn').addEventListener('click', () => act($('applyBtn'), 'Applying…', () => api('update', readForm())));
+$('stopBtn').addEventListener('click', () => act($('stopBtn'), 'Stopping…', () => api('stop', {})));
 $('form').addEventListener('input', e => {
   if (e.target.id === 'clientsRange') $('clients').value = e.target.value;
   if (e.target.id === 'clients') $('clientsRange').value = Math.min(e.target.value, 5000);
@@ -709,8 +717,8 @@ window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer
     $('target').textContent = '⚠ ' + $('target').textContent + ' · production';
   }
   await loadRuns();
-  poll();
-  setInterval(poll, 1000);
+  // The next poll waits for this one, so a busy load test doesn't pile up requests ahead of a click.
+  (async function loop() { await poll(); setTimeout(loop, 1000); })();
 })();
 </script>
 </body>
