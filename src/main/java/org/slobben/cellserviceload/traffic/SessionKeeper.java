@@ -54,13 +54,17 @@ public class SessionKeeper {
   public void watchdog() {
     long now = System.currentTimeMillis();
     for (Client client : clientRegistry.all()) {
+      boolean closed = !client.getConnection().isConnected();
       boolean silent = client.getLastServerContactMs() < now - reconnectThresholdMs;
-      if (client.isReconnecting()
-          || client.getNextReconnectAtMs() > now
-          || !(silent || !client.getConnection().isConnected())) {
+      if (client.isReconnecting() || client.getNextReconnectAtMs() > now || !(closed || silent)) {
         continue;
       }
       client.setReconnecting(true);
+      if (client.getRetryDelayMs() > 0) {
+        trafficStats.count(TrafficStats.Counter.RECONNECTS_RETRY);
+      } else {
+        trafficStats.count(closed ? TrafficStats.Counter.RECONNECTS_CLOSED : TrafficStats.Counter.RECONNECTS_SILENT);
+      }
       virtualThreadExecutor.execute(() -> reconnect(client));
     }
   }
@@ -75,7 +79,6 @@ public class SessionKeeper {
               .time(() -> connect(client).orTimeout(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS).join());
       start(client, connection);
       client.setRetryDelayMs(0);
-      trafficStats.count(TrafficStats.Counter.RECONNECTS);
     } catch (Exception e) {
       long delay =
           client.getRetryDelayMs() == 0
@@ -83,7 +86,6 @@ public class SessionKeeper {
               : Math.min(client.getRetryDelayMs() * 2, MAX_RETRY_DELAY_MS);
       client.setRetryDelayMs(delay);
       client.setNextReconnectAtMs(System.currentTimeMillis() + delay);
-      trafficStats.count(TrafficStats.Counter.RECONNECT_FAILURES);
       log.debug("reconnect failed: {}", e.toString());
     } finally {
       client.setReconnecting(false);

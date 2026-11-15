@@ -12,6 +12,7 @@ import org.slobben.cellserviceload.adapter.rest.Coordinates;
 import org.slobben.cellserviceload.adapter.rest.ServiceApiWrapper;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClientException;
 
 /**
  * Moves each client's camera like a user would: idle most of the time, now and then a pan, a zoom
@@ -64,6 +65,9 @@ public class ViewportMover {
             }
             try {
               step(client, now);
+            } catch (RestClientException e) {
+              // counted in the report's viewport timings
+              log.debug("viewport failed: {}", e.toString());
             } catch (RuntimeException e) {
               log.warn("move failed: {}", e.toString());
             } finally {

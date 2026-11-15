@@ -19,6 +19,7 @@ public class Client {
   private final ReentrantLock lock = new ReentrantLock();
   private final Set<String> blocksInView = new HashSet<>();
   @Setter private int[] viewRange;
+  private final long createdAtMs = System.currentTimeMillis();
 
   // Renewed on reconnect; each connection is a new client on the server.
   @Setter private volatile WebSocketClientConnection connection;
