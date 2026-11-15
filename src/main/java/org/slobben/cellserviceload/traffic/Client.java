@@ -14,7 +14,7 @@ import org.slobben.cellserviceload.adapter.websocket.WebSocketClientConnection;
 public class Client {
   private final Camera camera;
   // Some users zoom all the way out; they watch many more blocks.
-  private final boolean zoomsOut;
+  @Setter private volatile boolean zoomsOut;
   private final TrafficStats stats;
   private final ReentrantLock lock = new ReentrantLock();
   private final Set<String> blocksInView = new HashSet<>();
@@ -33,6 +33,7 @@ public class Client {
   @Setter private volatile boolean noBlocks;
   // Not reset on reconnect, so a gap includes the time a reconnect took.
   private volatile long lastFrameAtMs;
+  private volatile boolean closed;
 
   @Setter private volatile ViewportMover.Action action = ViewportMover.Action.IDLE;
   @Setter private volatile long actionEndsAtMs;
@@ -55,6 +56,17 @@ public class Client {
     viewRange = camera.blockRange();
     blocksInView.clear();
     blocksInView.addAll(Camera.blocksIn(viewRange));
+  }
+
+  /** Closes the client for good, after a reconnect that is going. */
+  public void close() {
+    lock.lock();
+    try {
+      closed = true;
+      connection.disconnect();
+    } finally {
+      lock.unlock();
+    }
   }
 
   public void markServerContact() {

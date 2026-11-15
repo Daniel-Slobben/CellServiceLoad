@@ -119,16 +119,38 @@ public class ViewportMover {
       client.setAction(Action.PAN);
       client.setActionEndsAtMs(now + rng.nextInt(PAN_MIN_MS, PAN_MAX_MS));
     } else if (roll < PAN_CHANCE_PERCENT + ZOOM_CHANCE_PERCENT) {
-      Device device = client.getCamera().device();
-      client.setZoomTarget(zoomTarget(client.isZoomsOut(), rng));
-      client.setZoomPointX(rng.nextDouble(device.width));
-      client.setZoomPointY(rng.nextDouble(device.height));
-      client.setAction(Action.ZOOM);
-      client.setActionEndsAtMs(now + ZOOM_MAX_MS);
+      startZoom(client, now);
     } else {
       // The previous/next button
       jump(client);
       idle(client, now);
+    }
+  }
+
+  private static void startZoom(Client client, long now) {
+    ThreadLocalRandom rng = ThreadLocalRandom.current();
+    Device device = client.getCamera().device();
+    client.setZoomTarget(zoomTarget(client.isZoomsOut(), rng));
+    client.setZoomPointX(rng.nextDouble(device.width));
+    client.setZoomPointY(rng.nextDouble(device.height));
+    client.setAction(Action.ZOOM);
+    client.setActionEndsAtMs(now + ZOOM_MAX_MS);
+  }
+
+  /** A running client becomes another device or another kind of user when the run's mix changes. */
+  public void change(Client client, Device device, boolean zoomsOut) {
+    client.getLock().lock();
+    try {
+      if (device != client.getCamera().device()) {
+        client.getCamera().setDevice(device);
+        publish(client);
+      }
+      if (zoomsOut != client.isZoomsOut()) {
+        client.setZoomsOut(zoomsOut);
+        startZoom(client, System.currentTimeMillis());
+      }
+    } finally {
+      client.getLock().unlock();
     }
   }
 

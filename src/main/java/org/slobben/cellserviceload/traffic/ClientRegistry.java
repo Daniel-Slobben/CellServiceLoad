@@ -14,6 +14,10 @@ public class ClientRegistry {
     clients.add(client);
   }
 
+  public void remove(Client client) {
+    clients.remove(client);
+  }
+
   public int size() {
     return clients.size();
   }
