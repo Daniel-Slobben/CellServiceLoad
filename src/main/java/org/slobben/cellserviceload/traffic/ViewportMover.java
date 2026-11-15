@@ -12,6 +12,7 @@ import org.slobben.cellserviceload.adapter.rest.Coordinates;
 import org.slobben.cellserviceload.adapter.rest.ServiceApiWrapper;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClientException;
 
 /**
  * Moves each client's camera like a user would: idle most of the time, now and then a pan, a zoom
@@ -52,7 +53,9 @@ public class ViewportMover {
     long now = System.currentTimeMillis();
     for (Client client : clientRegistry.all()) {
       if (client.isReconnecting()
-          || (client.getAction() == Action.IDLE && client.getActionEndsAtMs() > now)) {
+          || (client.getAction() == Action.IDLE
+              && client.getActionEndsAtMs() > now
+              && !client.isNoBlocks())) {
         continue;
       }
       virtualThreadExecutor.execute(
@@ -62,8 +65,11 @@ public class ViewportMover {
             }
             try {
               step(client, now);
+            } catch (RestClientException e) {
+              // counted in the report's viewport timings
+              log.debug("viewport failed: {}", e.toString());
             } catch (RuntimeException e) {
-              log.warn("move failed for {}: {}", client.getId(), e.toString());
+              log.warn("move failed: {}", e.toString());
             } finally {
               client.getLock().unlock();
             }
@@ -76,6 +82,13 @@ public class ViewportMover {
     client.setLastMoveAtMs(now);
     Camera camera = client.getCamera();
 
+    if (client.isNoBlocks()) {
+      client.setNoBlocks(false);
+      jump(client);
+      idle(client, now);
+      publish(client);
+      return;
+    }
     switch (client.getAction()) {
       case IDLE -> startNextAction(client, now);
       case PAN -> camera.pan(client.getPanVelocityX() * seconds, client.getPanVelocityY() * seconds);
@@ -113,11 +126,16 @@ public class ViewportMover {
       client.setAction(Action.ZOOM);
       client.setActionEndsAtMs(now + ZOOM_MAX_MS);
     } else {
-      // The previous/next button: the frontend centres on a fresh interesting viewport.
-      Coordinates viewport = trafficStats.getViewportLatency().time(serviceApiWrapper::getViewport);
-      client.getCamera().centerOn(viewport.x(), viewport.y());
+      // The previous/next button
+      jump(client);
       idle(client, now);
     }
+  }
+
+  // The frontend centres on a fresh interesting viewport.
+  private void jump(Client client) {
+    Coordinates viewport = trafficStats.getViewportLatency().time(serviceApiWrapper::getViewport);
+    client.getCamera().centerOn(viewport.x(), viewport.y());
   }
 
   // Log-uniform, so zooming in and out are equally likely around the default.

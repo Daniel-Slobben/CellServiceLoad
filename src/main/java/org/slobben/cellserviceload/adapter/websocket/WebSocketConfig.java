@@ -63,12 +63,14 @@ public class WebSocketConfig {
       JettyNativeWebSocketClient jettyNativeWebSocketClient,
       ThreadPoolTaskScheduler stompHeartbeatScheduler) {
     WebSocketStompClient stompClient = new WebSocketStompClient(jettyNativeWebSocketClient);
-    // block frames arrive as octet-stream, health check responses and our requests are JSON
+    // block frames arrive as octet-stream, status responses and our requests are JSON
     stompClient.setMessageConverter(
         new CompositeMessageConverter(
             List.of(new ByteArrayMessageConverter(), new JacksonJsonMessageConverter())));
     stompClient.setTaskScheduler(stompHeartbeatScheduler);
-    stompClient.setDefaultHeartbeat(new long[] {0, 0});
+    // Like the frontend, send a heartbeat every 5 s, or the server closes the session. Silence from the
+    // server is caught by SessionKeeper's watchdog instead.
+    stompClient.setDefaultHeartbeat(new long[] {5000, 0});
     stompClient.setInboundMessageSizeLimit(MAX_MESSAGE_BYTES);
     return stompClient;
   }

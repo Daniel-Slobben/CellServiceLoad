@@ -15,12 +15,12 @@ class BlockFrameTest {
   void countsFullAndBorderBlocks() {
     byte[] frame = frame(block(0, 3), block(1, 0), block(1, 5));
 
-    assertEquals(new BlockFrame(frame.length, 1, 2), BlockFrame.read(frame));
+    assertEquals(new BlockFrame(frame.length, 1, 17 + 3, 2, 17 + 17 + 5), BlockFrame.read(frame));
   }
 
   @Test
   void emptyFrameHasNoBlocks() {
-    assertEquals(new BlockFrame(0, 0, 0), BlockFrame.read(new byte[0]));
+    assertEquals(new BlockFrame(0, 0, 0, 0, 0), BlockFrame.read(new byte[0]));
   }
 
   @Test

@@ -14,12 +14,13 @@ import java.nio.ByteOrder;
  *  8      u8    type (0 = FULL, 1 = BORDER)
  *  9      u32   generation
  * 13      u32   encodedCells length
- * 17      ...   encodedCells (LZ4 block)
+ * 17      ...   encodedCells (zstd frame)
  * </pre>
  *
  * Only the headers are read; the load test never decompresses cells.
  */
-public record BlockFrame(int bytes, int fullBlocks, int borderBlocks) {
+// The bytes per type include the block headers, so fullBytes + borderBytes == bytes.
+public record BlockFrame(int bytes, int fullBlocks, int fullBytes, int borderBlocks, int borderBytes) {
 
   static final int BLOCK_HEADER_BYTES = 17;
   private static final int TYPE_OFFSET = 8;
@@ -30,7 +31,9 @@ public record BlockFrame(int bytes, int fullBlocks, int borderBlocks) {
   public static BlockFrame read(byte[] frame) {
     ByteBuffer buffer = ByteBuffer.wrap(frame).order(ByteOrder.LITTLE_ENDIAN);
     int full = 0;
+    int fullBytes = 0;
     int border = 0;
+    int borderBytes = 0;
     for (int start = 0; start < frame.length; ) {
       if (start + BLOCK_HEADER_BYTES > frame.length) {
         throw new IllegalArgumentException("truncated block header at " + start);
@@ -40,12 +43,18 @@ public record BlockFrame(int bytes, int fullBlocks, int borderBlocks) {
         throw new IllegalArgumentException("block payload at " + start + " runs past the frame");
       }
       switch (frame[start + TYPE_OFFSET]) {
-        case FULL -> full++;
-        case BORDER -> border++;
+        case FULL -> {
+          full++;
+          fullBytes += (int) end - start;
+        }
+        case BORDER -> {
+          border++;
+          borderBytes += (int) end - start;
+        }
         default -> throw new IllegalArgumentException("unknown block type at " + start);
       }
       start = (int) end;
     }
-    return new BlockFrame(frame.length, full, border);
+    return new BlockFrame(frame.length, full, fullBytes, border, borderBytes);
   }
 }

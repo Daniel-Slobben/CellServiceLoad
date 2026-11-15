@@ -1,6 +1,7 @@
 package org.slobben.cellserviceload.adapter.rest;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -29,14 +30,6 @@ public class ServiceApiWrapper {
 
   public Coordinates getViewport() {
     return Objects.requireNonNull(
-        restTemplate.getForObject(baseUrl + "/gen-api/viewport", Coordinates.class));
-  }
-
-  public ReconnectResponse reconnect(String[] visibleBlocks) {
-    return Objects.requireNonNull(
-        restTemplate.postForObject(
-            baseUrl + "/gen-api/reconnect",
-            new ReconnectRequest(visibleBlocks),
-            ReconnectResponse.class));
+        restTemplate.postForObject(baseUrl + "/gen-api/viewport", List.of(), Coordinates.class));
   }
 }

@@ -20,20 +20,26 @@ public class TrafficStats {
     FRAMES,
     FRAME_BYTES,
     FULL_BLOCKS,
+    FULL_BYTES,
     BORDER_BLOCKS,
+    BORDER_BYTES,
     // gaps the frontend's watchdog would have reconnected on
     SLOW_FRAME_GAPS,
-    SESSIONS_DEAD,
-    RECONNECTS,
-    RECONNECT_FAILURES,
-    CONNECT_FAILURES
+    NO_BLOCKS,
+    CLIENTS_STARTED,
+    // clients whose /settings or first socket failed
+    START_FAILURES,
+    // why a reconnect started: the socket closed, the server went silent, or the last try failed
+    RECONNECTS_CLOSED,
+    RECONNECTS_SILENT,
+    RECONNECTS_RETRY
   }
 
   // Time between block frames per client: the server tick as a user sees it, reconnects included.
   private final LatencyHistogram frameGaps = new LatencyHistogram();
-  private final LatencyHistogram healthAckRtt = new LatencyHistogram();
   private final LatencyHistogram settingsLatency = new LatencyHistogram();
   private final LatencyHistogram viewportLatency = new LatencyHistogram();
+  // From starting a new socket to its STOMP session being connected; its failures are failed reconnects.
   private final LatencyHistogram reconnectLatency = new LatencyHistogram();
 
   @Getter(AccessLevel.NONE)
@@ -53,7 +59,9 @@ public class TrafficStats {
     count(Counter.FRAMES);
     counters.addAndGet(Counter.FRAME_BYTES.ordinal(), frame.bytes());
     counters.addAndGet(Counter.FULL_BLOCKS.ordinal(), frame.fullBlocks());
+    counters.addAndGet(Counter.FULL_BYTES.ordinal(), frame.fullBytes());
     counters.addAndGet(Counter.BORDER_BLOCKS.ordinal(), frame.borderBlocks());
+    counters.addAndGet(Counter.BORDER_BYTES.ordinal(), frame.borderBytes());
     largestFrameBytes.accumulateAndGet(frame.bytes(), Math::max);
   }
 

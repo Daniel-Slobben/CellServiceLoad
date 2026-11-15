@@ -1,8 +1,9 @@
 package org.slobben.cellserviceload.adapter.websocket;
 
-/** Receives what the server sends on a client's topic. */
+/** Receives what the server sends to a client's session. */
 public interface TopicListener {
   default void onBlocks(BlockFrame frame) {}
 
-  default void onHealthCheck(HealthCheckResponse.Type type) {}
+  /** None of the blocks the connection started with exist. */
+  default void onNoBlocks() {}
 }

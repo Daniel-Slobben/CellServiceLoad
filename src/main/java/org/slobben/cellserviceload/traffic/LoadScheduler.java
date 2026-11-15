@@ -11,6 +11,7 @@ import org.slobben.cellserviceload.adapter.rest.Settings;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClientException;
 
 @Component
 @RequiredArgsConstructor
@@ -56,7 +57,6 @@ public class LoadScheduler {
       Device device = rng.nextDouble() < phoneShare ? Device.PHONE : Device.DESKTOP;
       Client client =
           new Client(
-              settings.clientId(),
               new Camera(device, settings.blockSize()),
               rng.nextDouble() < zoomedOutShare,
               trafficStats);
@@ -68,8 +68,8 @@ public class LoadScheduler {
               (connection, error) -> {
                 try {
                   if (error != null) {
-                    trafficStats.count(TrafficStats.Counter.CONNECT_FAILURES);
-                    log.warn("connect failed for {}: {}", client.getId(), error.toString());
+                    trafficStats.count(TrafficStats.Counter.START_FAILURES);
+                    log.debug("connect failed: {}", error.toString());
                     return;
                   }
                   sessionKeeper.start(client, connection);
@@ -77,13 +77,18 @@ public class LoadScheduler {
                   client.setLastMoveAtMs(now);
                   client.setActionEndsAtMs(now + ThreadLocalRandom.current().nextInt(3_000));
                   clientRegistry.add(client);
+                  trafficStats.count(TrafficStats.Counter.CLIENTS_STARTED);
                 } finally {
                   inFlight.release();
                 }
               });
+    } catch (RestClientException e) {
+      inFlight.release();
+      trafficStats.count(TrafficStats.Counter.START_FAILURES);
+      log.debug("settings failed: {}", e.toString());
     } catch (RuntimeException e) {
       inFlight.release();
-      trafficStats.count(TrafficStats.Counter.CONNECT_FAILURES);
+      trafficStats.count(TrafficStats.Counter.START_FAILURES);
       log.warn("client creation failed: {}", e.toString());
     }
   }
