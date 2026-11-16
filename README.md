@@ -6,10 +6,10 @@ with its visible blocks sent to `/client-update`. On the server one socket is on
 opens a new socket when its socket closes or the server is silent for
 the run's watchdog threshold, retrying after 1, 2, 4 and 8 s. Every new socket is a new client to the
 server, so it sends the whole view again and gets it back as FULL blocks. Clients pan, zoom (out to the
-frontend's limit, as many cells as a 4K screen at 0.065 px per cell) and jump to `POST /gen-api/viewport`
+frontend's limit, as many cells as a 4K screen at 0.083 px per cell) and jump to `POST /gen-api/viewport`
 with phone or desktop screen sizes, and also jump when the server answers `NO_BLOCKS`. Like the
-frontend, a client with more than 200 blocks drawn asks for SECTORs instead of cells, and goes back to
-cells below 160.
+frontend, a client asks for SECTORs instead of cells once a sector is 1 px or smaller on screen, and goes
+back to cells above 1.1 px: phones zoomed far out do, desktops never.
 
 ## Running
 

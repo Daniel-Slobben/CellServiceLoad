@@ -8,8 +8,10 @@ import org.slobben.cellserviceload.utils.BlockUtils;
 /** The frontend's grid view: offsets in cells, zoom as screen pixels per cell. */
 public class Camera {
   static final double DEFAULT_CELL_SIZE = 2.5;
-  // The frontend's zoom-out limit: as many cells as a 4K screen at 0.065 px per cell, ~490 blocks of 2000.
-  static final double MAX_CELLS_IN_VIEW = (3840 / 0.065) * (2160 / 0.065);
+  // The frontend's zoom-out limit: as many cells as a 4K screen at 0.083 px per cell, ~300 blocks of 2000.
+  static final double MAX_CELLS_IN_VIEW = (3840 / 0.083) * (2160 / 0.083);
+  // The backend's sectors, in cells.
+  static final int SECTOR_CELLS = 50;
   static final double MAX_CELL_SIZE = 30;
 
   private Device device;
@@ -82,13 +84,9 @@ public class Camera {
     return new int[] {startBlockX - ringX, endBlockX + ringX, startBlockY - ringY, endBlockY + ringY};
   }
 
-  /** The blocks the frontend draws, which decide sectors: the block range without its ring. */
-  public int drawnBlocks() {
-    int startBlockX = (int) Math.floor(cellOffsetX / blockSize);
-    int startBlockY = (int) Math.floor(cellOffsetY / blockSize);
-    int endBlockX = (int) Math.floor((cellOffsetX + device.width / cellSize) / blockSize);
-    int endBlockY = (int) Math.floor((cellOffsetY + device.height / cellSize) / blockSize);
-    return (endBlockX - startBlockX + 1) * (endBlockY - startBlockY + 1);
+  /** How wide a sector is on screen, which decides sectors. */
+  public double sectorPixels() {
+    return cellSize * SECTOR_CELLS;
   }
 
   public static Set<String> blocksIn(int[] range) {

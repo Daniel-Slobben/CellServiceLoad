@@ -36,8 +36,9 @@ public class ViewportMover {
   private static final int ZOOM_MAX_MS = 10_000;
   private static final int PAN_CHANCE_PERCENT = 55;
   private static final int ZOOM_CHANCE_PERCENT = 30;
-  // The frontend's default for now: above this many blocks drawn it asks for sectors, below 80% of it for cells again.
-  static final int SECTOR_BLOCKS = 200;
+  // The frontend's default for now: once a sector is this many pixels or smaller it asks for sectors, above 110% of it
+  // for cells again. A phone gets there, a desktop never zooms out that far.
+  static final double SECTOR_PIXELS = 1;
 
   public enum Action {
     IDLE,
@@ -176,8 +177,8 @@ public class ViewportMover {
 
   private static void publish(Client client) {
     int[] range = client.getCamera().blockRange();
-    int drawn = client.getCamera().drawnBlocks();
-    boolean sectors = drawn > SECTOR_BLOCKS || (client.isSectors() && drawn >= 0.8 * SECTOR_BLOCKS);
+    double sectorPixels = client.getCamera().sectorPixels();
+    boolean sectors = sectorPixels <= SECTOR_PIXELS || (client.isSectors() && sectorPixels <= 1.1 * SECTOR_PIXELS);
     if (Arrays.equals(range, client.getViewRange()) && sectors == client.isSectors()) {
       return;
     }
