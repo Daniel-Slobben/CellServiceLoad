@@ -37,13 +37,13 @@ class CameraTest {
   }
 
   @Test
-  void zoomedAllTheWayOutOnDesktopWatchesAboutFourHundredBlocksAsCells() {
+  void zoomedAllTheWayOutOnDesktopWatchesAboutThreeHundredBlocksAsCells() {
     Camera camera = zoomedAllTheWayOut(Device.DESKTOP);
     int[] range = camera.blockRange();
     int blocks = (range[1] - range[0] + 1) * (range[3] - range[2] + 1);
 
     assertEquals(Camera.blocksIn(range).size(), blocks);
-    assertEquals(true, blocks >= 400 && blocks <= 550, "blocks: " + blocks);
+    assertEquals(true, blocks >= 300 && blocks <= 420, "blocks: " + blocks);
     assertEquals(true, camera.sectorPixels() > ViewportMover.SECTOR_PIXELS, "sector px: " + camera.sectorPixels());
   }
 

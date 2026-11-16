@@ -8,8 +8,8 @@ import org.slobben.cellserviceload.utils.BlockUtils;
 /** The frontend's grid view: offsets in cells, zoom as screen pixels per cell. */
 public class Camera {
   static final double DEFAULT_CELL_SIZE = 2.5;
-  // The frontend's zoom-out limit: as many cells as a 4K screen at 0.07 px per cell, ~420 blocks of 2000.
-  static final double MAX_CELLS_IN_VIEW = (3840 / 0.07) * (2160 / 0.07);
+  // The frontend's zoom-out limit: as many cells as a 4K screen at 0.083 px per cell, ~300 blocks of 2000.
+  static final double MAX_CELLS_IN_VIEW = (3840 / 0.083) * (2160 / 0.083);
   // The backend's sectors, in cells.
   static final int SECTOR_CELLS = 50;
   static final double MAX_CELL_SIZE = 30;
