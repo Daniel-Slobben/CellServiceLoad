@@ -34,6 +34,7 @@ public class TrafficReporter {
     int reconnecting = 0;
     int stuck = 0;
     int zoomedOut = 0;
+    int sectors = 0;
     long blocksWatched = 0;
     int maxBlocksWatched = 0;
     for (Client client : clientRegistry.all()) {
@@ -54,6 +55,9 @@ public class TrafficReporter {
       if (client.getCamera().cellSize() < ZOOMED_OUT_CELL_SIZE) {
         zoomedOut++;
       }
+      if (client.isSectors()) {
+        sectors++;
+      }
     }
     return new ClientCounts(
         clients,
@@ -62,6 +66,7 @@ public class TrafficReporter {
         loadScheduler.starting(),
         stuck,
         zoomedOut,
+        sectors,
         clients == 0 ? 0 : blocksWatched / clients,
         maxBlocksWatched);
   }
@@ -99,7 +104,7 @@ public class TrafficReporter {
     Map<Counter, Long> counts = report.counts();
     double seconds = report.seconds();
     log.info(
-        "===== {}m{}s ===== clients={} socketsOpen={} reconnecting={} starting={} stuck={} | zoomedOut={} blocksWatched avg={} max={}",
+        "===== {}m{}s ===== clients={} socketsOpen={} reconnecting={} starting={} stuck={} | zoomedOut={} sectors={} blocksWatched avg={} max={}",
         report.atS() / 60,
         "%02d".formatted(report.atS() % 60),
         c.clients(),
@@ -108,12 +113,13 @@ public class TrafficReporter {
         c.starting(),
         c.stuck(),
         c.zoomedOut(),
+        c.sectors(),
         c.blocksAvg(),
         c.blocksMax());
     long bytes = counts.get(FRAME_BYTES);
     long fullBlocks = counts.get(FULL_BLOCKS);
     log.info(
-        "download {}MB/s ({}KB/s per client) | full {}MB/s: {}/s avg {}KB | border {}MB/s: {}/s | frames {}/s largest {}KB",
+        "download {}MB/s ({}KB/s per client) | full {}MB/s: {}/s avg {}KB | border {}MB/s: {}/s | sector {}MB/s: {}/s | frames {}/s largest {}KB",
         megabytesPerSecond(bytes, seconds),
         c.clients() == 0 ? 0 : (long) (bytes / seconds / 1024 / c.clients()),
         megabytesPerSecond(counts.get(FULL_BYTES), seconds),
@@ -121,6 +127,8 @@ public class TrafficReporter {
         fullBlocks == 0 ? 0 : counts.get(FULL_BYTES) / fullBlocks / 1024,
         megabytesPerSecond(counts.get(BORDER_BYTES), seconds),
         perSecond(counts.get(BORDER_BLOCKS), seconds),
+        megabytesPerSecond(counts.get(SECTOR_BYTES), seconds),
+        perSecond(counts.get(SECTOR_BLOCKS), seconds),
         perSecond(counts.get(FRAMES), seconds),
         report.largestFrameBytes() / 1024);
     log.info(

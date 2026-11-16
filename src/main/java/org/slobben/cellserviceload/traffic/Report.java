@@ -25,6 +25,7 @@ public record Report(
       int starting,
       int stuck,
       int zoomedOut,
+      int sectors,
       long blocksAvg,
       int blocksMax) {}
 }

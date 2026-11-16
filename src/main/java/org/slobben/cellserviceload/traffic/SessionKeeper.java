@@ -43,7 +43,8 @@ public class SessionKeeper {
   public void start(Client client, WebSocketClientConnection connection) {
     client.setConnection(connection);
     client.markServerContact();
-    connection.sendClientUpdateRequest(new String[0], client.getBlocksInView().toArray(new String[0]));
+    connection.sendClientUpdateRequest(
+        new String[0], client.getBlocksInView().toArray(new String[0]), client.isSectors());
   }
 
   @Scheduled(fixedDelay = 250)

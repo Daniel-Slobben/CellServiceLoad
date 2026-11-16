@@ -12,15 +12,15 @@ import org.junit.jupiter.api.Test;
 class BlockFrameTest {
 
   @Test
-  void countsFullAndBorderBlocks() {
-    byte[] frame = frame(block(0, 3), block(1, 0), block(1, 5));
+  void countsFullBorderAndSectorBlocks() {
+    byte[] frame = frame(block(0, 3), block(1, 0), block(1, 5), block(2, 9));
 
-    assertEquals(new BlockFrame(frame.length, 1, 17 + 3, 2, 17 + 17 + 5), BlockFrame.read(frame));
+    assertEquals(new BlockFrame(frame.length, 1, 17 + 3, 2, 17 + 17 + 5, 1, 17 + 9), BlockFrame.read(frame));
   }
 
   @Test
   void emptyFrameHasNoBlocks() {
-    assertEquals(new BlockFrame(0, 0, 0, 0, 0), BlockFrame.read(new byte[0]));
+    assertEquals(new BlockFrame(0, 0, 0, 0, 0, 0, 0), BlockFrame.read(new byte[0]));
   }
 
   @Test

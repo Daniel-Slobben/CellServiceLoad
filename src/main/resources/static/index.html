@@ -426,7 +426,7 @@ function renderStatus(clients) {
 let lastClients = null;
 function renderTiles(clients) {
   if (clients) lastClients = clients;
-  const c = lastClients || { clients: 0, open: 0, reconnecting: 0, starting: 0, stuck: 0, zoomedOut: 0, blocksAvg: 0, blocksMax: 0 };
+  const c = lastClients || { clients: 0, open: 0, reconnecting: 0, starting: 0, stuck: 0, zoomedOut: 0, sectors: 0, blocksAvg: 0, blocksMax: 0 };
   const live = liveRun();
   const target = live ? live.config.clients : 0;
   const r = live && live.reports.length ? live.reports[live.reports.length - 1] : null;
@@ -434,7 +434,7 @@ function renderTiles(clients) {
   const tiles = [
     { label: 'Running', value: int(c.clients), small: target ? `/ ${int(target)}` : '', sub: `open ${int(c.open)} · starting ${c.starting}`, progress: target ? c.clients / target : 0 },
     { label: 'Stuck', value: int(c.stuck), warn: c.stuck > 0, sub: `no frame in ${threshold / 1000} s` },
-    { label: 'Reconnecting', value: int(c.reconnecting), sub: `${int(c.zoomedOut)} zoomed out` },
+    { label: 'Reconnecting', value: int(c.reconnecting), sub: `${int(c.zoomedOut)} zoomed out · ${int(c.sectors)} sectors` },
     { label: 'Download', value: r ? dec(mbps(r.counts.FRAME_BYTES, r), 2) : '–', small: 'MB/s', sub: r && r.clients.clients ? `${int(r.counts.FRAME_BYTES / r.seconds / 1024 / r.clients.clients)} KB/s per client` : 'last 10 s' },
     { label: 'Frame gap p95', value: r && r.frameGaps.count ? int(r.frameGaps.p95) : '–', small: 'ms', warn: r && r.frameGaps.p95 > threshold, sub: r && r.frameGaps.count ? `p50 ${int(r.frameGaps.p50)} · p99 ${int(r.frameGaps.p99)}` : 'last 10 s' },
     { label: 'Blocks watched', value: int(c.blocksAvg), small: 'avg', sub: `max ${int(c.blocksMax)}` },
@@ -468,7 +468,8 @@ const CHARTS = [
     ref: run => ({ value: run.config.clients, label: 'target', always: true }), fmt: int },
   { title: 'Download', unit: 'MB/s', series: [
       { name: 'full', get: r => mbps(r.counts.FULL_BYTES, r) },
-      { name: 'border', get: r => mbps(r.counts.BORDER_BYTES, r) }], fmt: v => dec(v, 2) },
+      { name: 'border', get: r => mbps(r.counts.BORDER_BYTES, r) },
+      { name: 'sector', get: r => mbps(r.counts.SECTOR_BYTES, r) }], fmt: v => dec(v, 2) },
   { title: 'Frame gaps', unit: 'ms', series: [
       { name: 'p50', get: r => lat(r.frameGaps, 'p50') },
       { name: 'p95', get: r => lat(r.frameGaps, 'p95') },

@@ -11,7 +11,7 @@ import java.nio.ByteOrder;
  * offset  type  field
  *  0      i32   x
  *  4      i32   y
- *  8      u8    type (0 = FULL, 1 = BORDER, 2 = SECTOR; load clients never ask for sectors)
+ *  8      u8    type (0 = FULL, 1 = BORDER, 2 = SECTOR)
  *  9      u32   generation
  * 13      u32   encodedCells length
  * 17      ...   encodedCells (zstd frame; FULL: the copied rows and runs of strips, see the backend's Packer)
@@ -19,14 +19,16 @@ import java.nio.ByteOrder;
  *
  * Only the headers are read; the load test never decompresses cells.
  */
-// The bytes per type include the block headers, so fullBytes + borderBytes == bytes.
-public record BlockFrame(int bytes, int fullBlocks, int fullBytes, int borderBlocks, int borderBytes) {
+// The bytes per type include the block headers, so fullBytes + borderBytes + sectorBytes == bytes.
+public record BlockFrame(
+    int bytes, int fullBlocks, int fullBytes, int borderBlocks, int borderBytes, int sectorBlocks, int sectorBytes) {
 
   static final int BLOCK_HEADER_BYTES = 17;
   private static final int TYPE_OFFSET = 8;
   private static final int LENGTH_OFFSET = 13;
   private static final int FULL = 0;
   private static final int BORDER = 1;
+  private static final int SECTOR = 2;
 
   public static BlockFrame read(byte[] frame) {
     ByteBuffer buffer = ByteBuffer.wrap(frame).order(ByteOrder.LITTLE_ENDIAN);
@@ -34,6 +36,8 @@ public record BlockFrame(int bytes, int fullBlocks, int fullBytes, int borderBlo
     int fullBytes = 0;
     int border = 0;
     int borderBytes = 0;
+    int sector = 0;
+    int sectorBytes = 0;
     for (int start = 0; start < frame.length; ) {
       if (start + BLOCK_HEADER_BYTES > frame.length) {
         throw new IllegalArgumentException("truncated block header at " + start);
@@ -51,10 +55,14 @@ public record BlockFrame(int bytes, int fullBlocks, int fullBytes, int borderBlo
           border++;
           borderBytes += (int) end - start;
         }
+        case SECTOR -> {
+          sector++;
+          sectorBytes += (int) end - start;
+        }
         default -> throw new IllegalArgumentException("unknown block type at " + start);
       }
       start = (int) end;
     }
-    return new BlockFrame(frame.length, full, fullBytes, border, borderBytes);
+    return new BlockFrame(frame.length, full, fullBytes, border, borderBytes, sector, sectorBytes);
   }
 }
