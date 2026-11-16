@@ -36,6 +36,8 @@ public class ViewportMover {
   private static final int ZOOM_MAX_MS = 10_000;
   private static final int PAN_CHANCE_PERCENT = 55;
   private static final int ZOOM_CHANCE_PERCENT = 30;
+  // The frontend's default for now: above this many blocks drawn it asks for sectors, below 80% of it for cells again.
+  static final int SECTOR_BLOCKS = 200;
 
   public enum Action {
     IDLE,
@@ -130,7 +132,7 @@ public class ViewportMover {
   private static void startZoom(Client client, long now) {
     ThreadLocalRandom rng = ThreadLocalRandom.current();
     Device device = client.getCamera().device();
-    client.setZoomTarget(zoomTarget(client.isZoomsOut(), rng));
+    client.setZoomTarget(zoomTarget(client.isZoomsOut(), client.getCamera().minCellSize(), rng));
     client.setZoomPointX(rng.nextDouble(device.width));
     client.setZoomPointY(rng.nextDouble(device.height));
     client.setAction(Action.ZOOM);
@@ -161,8 +163,8 @@ public class ViewportMover {
   }
 
   // Log-uniform, so zooming in and out are equally likely around the default.
-  private static double zoomTarget(boolean zoomsOut, ThreadLocalRandom rng) {
-    double min = zoomsOut ? Camera.MIN_CELL_SIZE : 0.8;
+  private static double zoomTarget(boolean zoomsOut, double minCellSize, ThreadLocalRandom rng) {
+    double min = zoomsOut ? minCellSize : 0.8;
     double max = zoomsOut ? 0.4 : 8;
     return Math.exp(rng.nextDouble(Math.log(min), Math.log(max)));
   }
@@ -174,16 +176,19 @@ public class ViewportMover {
 
   private static void publish(Client client) {
     int[] range = client.getCamera().blockRange();
-    if (Arrays.equals(range, client.getViewRange())) {
+    int drawn = client.getCamera().drawnBlocks();
+    boolean sectors = drawn > SECTOR_BLOCKS || (client.isSectors() && drawn >= 0.8 * SECTOR_BLOCKS);
+    if (Arrays.equals(range, client.getViewRange()) && sectors == client.isSectors()) {
       return;
     }
     client.setViewRange(range);
+    client.setSectors(sectors);
     Set<String> oldBlocks = client.getBlocksInView();
     Set<String> newBlocks = Camera.blocksIn(range);
     String[] toRemove = diff(oldBlocks, newBlocks);
     String[] toAdd = diff(newBlocks, oldBlocks);
 
-    client.getConnection().sendClientUpdateRequest(toRemove, toAdd);
+    client.getConnection().sendClientUpdateRequest(toRemove, toAdd, sectors);
     oldBlocks.clear();
     oldBlocks.addAll(newBlocks);
   }

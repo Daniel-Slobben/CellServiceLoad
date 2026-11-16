@@ -37,16 +37,25 @@ class CameraTest {
   }
 
   @Test
-  void zoomedAllTheWayOutOnDesktopWatchesAboutAHundredBlocks() {
+  void zoomedAllTheWayOutOnDesktopWatchesAboutFiveHundredBlocksAsSectors() {
     Camera camera = new Camera(Device.DESKTOP, BLOCK_SIZE);
     camera.centerOn(0, 0);
-    while (camera.cellSize() * 0.95 >= Camera.MIN_CELL_SIZE) {
+    while (camera.cellSize() * 0.95 >= camera.minCellSize()) {
       camera.zoomAt(960, 525, 0.95);
     }
     int[] range = camera.blockRange();
     int blocks = (range[1] - range[0] + 1) * (range[3] - range[2] + 1);
 
     assertEquals(Camera.blocksIn(range).size(), blocks);
-    assertEquals(true, blocks >= 80 && blocks <= 120, "blocks: " + blocks);
+    assertEquals(true, blocks >= 400 && blocks <= 650, "blocks: " + blocks);
+    assertEquals(true, camera.drawnBlocks() > ViewportMover.SECTOR_BLOCKS, "drawn: " + camera.drawnBlocks());
+  }
+
+  @Test
+  void drawnBlocksLeaveOutTheRing() {
+    Camera camera = new Camera(Device.PHONE, BLOCK_SIZE);
+    camera.centerOn(500, 500);
+
+    assertEquals(1, camera.drawnBlocks());
   }
 }

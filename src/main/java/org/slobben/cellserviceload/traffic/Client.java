@@ -19,6 +19,8 @@ public class Client {
   private final ReentrantLock lock = new ReentrantLock();
   private final Set<String> blocksInView = new HashSet<>();
   @Setter private int[] viewRange;
+  // Zoomed far out the frontend asks for sectors instead of cells.
+  @Setter private volatile boolean sectors;
   private final long createdAtMs = System.currentTimeMillis();
 
   // Renewed on reconnect; each connection is a new client on the server.

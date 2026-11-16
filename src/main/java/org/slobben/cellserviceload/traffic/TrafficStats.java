@@ -23,6 +23,8 @@ public class TrafficStats {
     FULL_BYTES,
     BORDER_BLOCKS,
     BORDER_BYTES,
+    SECTOR_BLOCKS,
+    SECTOR_BYTES,
     // gaps the frontend's watchdog would have reconnected on
     SLOW_FRAME_GAPS,
     NO_BLOCKS,
@@ -62,6 +64,8 @@ public class TrafficStats {
     counters.addAndGet(Counter.FULL_BYTES.ordinal(), frame.fullBytes());
     counters.addAndGet(Counter.BORDER_BLOCKS.ordinal(), frame.borderBlocks());
     counters.addAndGet(Counter.BORDER_BYTES.ordinal(), frame.borderBytes());
+    counters.addAndGet(Counter.SECTOR_BLOCKS.ordinal(), frame.sectorBlocks());
+    counters.addAndGet(Counter.SECTOR_BYTES.ordinal(), frame.sectorBytes());
     largestFrameBytes.accumulateAndGet(frame.bytes(), Math::max);
   }
 

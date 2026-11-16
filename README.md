@@ -5,9 +5,11 @@ Simulates many browsers on the Cells backend. Each client behaves like the Angul
 with its visible blocks sent to `/client-update`. On the server one socket is one client. A client
 opens a new socket when its socket closes or the server is silent for
 the run's watchdog threshold, retrying after 1, 2, 4 and 8 s. Every new socket is a new client to the
-server, so it sends the whole view again and gets it back as FULL blocks. Clients pan, zoom (down to
-0.1 px per cell) and jump to `POST /gen-api/viewport` with phone or desktop screen sizes, and also jump
-when the server answers `NO_BLOCKS`.
+server, so it sends the whole view again and gets it back as FULL blocks. Clients pan, zoom (out to the
+frontend's limit, as many cells as a 4K screen at 0.065 px per cell) and jump to `POST /gen-api/viewport`
+with phone or desktop screen sizes, and also jump when the server answers `NO_BLOCKS`. Like the
+frontend, a client with more than 200 blocks drawn asks for SECTORs instead of cells, and goes back to
+cells below 160.
 
 ## Running
 
@@ -39,7 +41,7 @@ The settings are the page's defaults:
 | `load.ramp-up-per-second` | 2 | new clients a second: 2000 clients in 17 minutes |
 | `load.duration-minutes` | 0 | stop the run after this long; 0 runs until stopped |
 | `load.phone-share` | 0.7 | the rest are desktops |
-| `load.zoomed-out-share` | 0.15 | clients that zoom out to 0.1-0.4 px per cell and watch up to ~100 blocks |
+| `load.zoomed-out-share` | 0.15 | clients that zoom out to between the limit and 0.4 px per cell, up to ~600 blocks; the farthest get sectors |
 | `load.reconnect-threshold-ms` | 4000 | the frontend's watchdog; change it to try another one |
 
 ## Bandwidth
@@ -57,8 +59,8 @@ Logged every 10 seconds of a run, with counts for those 10 seconds (made-up numb
 the same numbers:
 
 ```
-===== 2m30s ===== clients=590 socketsOpen=588 reconnecting=2 starting=1 stuck=3 | zoomedOut=70 blocksWatched avg=9 max=96
-download 11.24MB/s (19KB/s per client) | full 9.80MB/s: 260/s avg 38KB | border 1.44MB/s: 6100/s | frames 1180/s largest 2100KB
+===== 2m30s ===== clients=590 socketsOpen=588 reconnecting=2 starting=1 stuck=3 | zoomedOut=70 sectors=12 blocksWatched avg=14 max=580
+download 11.24MB/s (19KB/s per client) | full 9.80MB/s: 260/s avg 38KB | border 1.44MB/s: 6100/s | sector 0.30MB/s: 1700/s | frames 1180/s largest 2100KB
 frame gaps ms p50=500 p95=520 p99=610 max=1830 (n=11800), over 4000ms=0
 sockets: started=40 startFailed=0 | reconnects closed=1 silent=1 retry=0, reconnect ms p50=40 p95=60 p99=60 max=52 (n=2) | noBlocks=0
 rest ms: settings p50=20 p95=40 p99=50 max=44 (n=40), viewport p50=20 p95=30 p99=30 max=27 (n=61)
@@ -68,7 +70,8 @@ rest ms: settings p50=20 p95=40 p99=50 max=44 (n=40), viewport p50=20 p95=30 p99
   one. `starting` are waiting for `/settings` or their first socket; at 16 ramp-up waits on them.
   `stuck` have had no block frame for longer than the watchdog threshold: what a user sees as a
   frozen screen.
-- **download**: block frame bytes, split into FULL and BORDER, with the average FULL block size.
+- **download**: block frame bytes, split into FULL, BORDER and SECTOR, with the average FULL block size.
+  `sectors` above counts the clients that ask for SECTORs.
 - **frame gaps**: time between block frames per client, the server tick as a user sees it; around
   500 ms when healthy. `over Xms` counts gaps the frontend would have reconnected on.
 - **sockets**: new clients and clients that failed to start, then reconnects by cause: the socket
