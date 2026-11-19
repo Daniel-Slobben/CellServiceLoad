@@ -3,8 +3,8 @@ package org.slobben.cellserviceload.traffic;
 /** The frontend's grid view: offsets in cells, zoom as screen pixels per cell. */
 public class Camera {
   static final double DEFAULT_CELL_SIZE = 2.5;
-  // The frontend's zoom-out limit: a block of 2000 cells at 8 px.
-  static final double MIN_CELL_SIZE = 0.004;
+  // The frontend's zoom-out limit: a block of 2000 cells at 16 px.
+  static final double MIN_CELL_SIZE = 0.008;
   // The backend's sectors, in cells.
   static final int SECTOR_CELLS = 50;
   // A big screen watches sectors once its view holds this many blocks, like the frontend.
