@@ -68,9 +68,9 @@ public class WebSocketConfig {
         new CompositeMessageConverter(
             List.of(new ByteArrayMessageConverter(), new JacksonJsonMessageConverter())));
     stompClient.setTaskScheduler(stompHeartbeatScheduler);
-    // Like the frontend, send a heartbeat every 5 s, or the server closes the session. Silence from the
-    // server is caught by SessionKeeper's watchdog instead.
-    stompClient.setDefaultHeartbeat(new long[] {5000, 0});
+    // Like the frontend, send a heartbeat every 5 s and ask for one every 2 s. Between sector tiles the
+    // heartbeats are all a sector client gets; Spring closes a session that reads nothing for 6 s.
+    stompClient.setDefaultHeartbeat(new long[] {5000, 2000});
     stompClient.setInboundMessageSizeLimit(MAX_MESSAGE_BYTES);
     return stompClient;
   }

@@ -49,7 +49,7 @@ public class TrafficReporter {
         reconnecting++;
       }
       long lastFrameAtMs = client.getLastFrameAtMs() > 0 ? client.getLastFrameAtMs() : client.getCreatedAtMs();
-      if (now - lastFrameAtMs > thresholdMs) {
+      if (!client.isSectors() && now - lastFrameAtMs > thresholdMs) {
         stuck++;
       }
       if (client.getCamera().cellSize() < ZOOMED_OUT_CELL_SIZE) {

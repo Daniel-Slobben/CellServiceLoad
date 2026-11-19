@@ -52,7 +52,8 @@ public class SessionKeeper {
     long reconnectThresholdMs = trafficStats.getReconnectThresholdMs();
     for (Client client : clientRegistry.all()) {
       boolean closed = !client.getConnection().isConnected();
-      boolean silent = client.getLastServerContactMs() < now - reconnectThresholdMs;
+      // a sector client gets a frame every 10 s, its silence shows as missed heartbeats instead
+      boolean silent = !client.isSectors() && client.getLastServerContactMs() < now - reconnectThresholdMs;
       if (client.isReconnecting() || client.getNextReconnectAtMs() > now || !(closed || silent)) {
         continue;
       }

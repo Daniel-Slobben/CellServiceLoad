@@ -84,7 +84,7 @@ public class Client {
       public void onBlocks(BlockFrame frame) {
         if (number != connectionNumber) return;
         long now = System.currentTimeMillis();
-        if (lastFrameAtMs > 0) {
+        if (lastFrameAtMs > 0 && !sectors) {
           stats.recordFrameGap(now - lastFrameAtMs);
         }
         lastFrameAtMs = now;
