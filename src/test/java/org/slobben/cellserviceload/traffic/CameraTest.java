@@ -45,6 +45,16 @@ class CameraTest {
     }
   }
 
+  @Test
+  void aDesktopSwitchesToSectorsAtAbout250BlocksAndAPhoneAt1Px() {
+    Camera desktop = new Camera(Device.DESKTOP, BLOCK_SIZE);
+    Camera phone = new Camera(Device.PHONE, BLOCK_SIZE);
+
+    // 1920x1050 px holds 250 blocks of 90 px: 2000 cells at 0.045 px, so sectors of 2.25 px
+    assertEquals(2.25, desktop.sectorSwitchPixels(), 0.01);
+    assertEquals(ViewportMover.SECTOR_PIXELS, phone.sectorSwitchPixels());
+  }
+
   private static Camera zoomedAllTheWayOut(Device device) {
     Camera camera = new Camera(device, BLOCK_SIZE);
     camera.centerOn(0, 0);

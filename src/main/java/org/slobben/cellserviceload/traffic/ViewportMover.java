@@ -177,8 +177,8 @@ public class ViewportMover {
 
   private static void publish(Client client) {
     int[] range = client.getCamera().blockRange();
-    double sectorPixels = client.getCamera().sectorPixels();
-    boolean sectors = sectorPixels <= SECTOR_PIXELS || (client.isSectors() && sectorPixels <= 1.1 * SECTOR_PIXELS);
+    double sectorPixels = client.getCamera().sectorPixels(), switchPixels = client.getCamera().sectorSwitchPixels();
+    boolean sectors = sectorPixels <= switchPixels || (client.isSectors() && sectorPixels <= 1.1 * switchPixels);
     if (Arrays.equals(range, client.getViewRange()) && sectors == client.isSectors()) {
       return;
     }
