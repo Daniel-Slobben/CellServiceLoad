@@ -17,6 +17,7 @@ public class Client {
   @Setter private volatile boolean zoomsOut;
   private final TrafficStats stats;
   private final ReentrantLock lock = new ReentrantLock();
+  // the blocks asked for: none while watching sectors
   private final Set<String> blocksInView = new HashSet<>();
   @Setter private int[] viewRange;
   // Zoomed far out the frontend asks for sectors instead of cells.
@@ -57,7 +58,7 @@ public class Client {
     camera.centerOn(worldX, worldY);
     viewRange = camera.blockRange();
     blocksInView.clear();
-    blocksInView.addAll(Camera.blocksIn(viewRange));
+    if (!sectors) blocksInView.addAll(Camera.blocksIn(viewRange));
   }
 
   /** Closes the client for good, after a reconnect that is going. */
