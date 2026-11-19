@@ -37,7 +37,7 @@ public class ViewportMover {
   private static final int PAN_CHANCE_PERCENT = 55;
   private static final int ZOOM_CHANCE_PERCENT = 30;
   // The frontend's default for now: once a sector is this many pixels or smaller it asks for sectors, above 110% of it
-  // for cells again. A phone gets there, a desktop never zooms out that far.
+  // for cells again.
   static final double SECTOR_PIXELS = 1;
 
   public enum Action {
@@ -133,7 +133,7 @@ public class ViewportMover {
   private static void startZoom(Client client, long now) {
     ThreadLocalRandom rng = ThreadLocalRandom.current();
     Device device = client.getCamera().device();
-    client.setZoomTarget(zoomTarget(client.isZoomsOut(), client.getCamera().minCellSize(), rng));
+    client.setZoomTarget(zoomTarget(client.isZoomsOut(), rng));
     client.setZoomPointX(rng.nextDouble(device.width));
     client.setZoomPointY(rng.nextDouble(device.height));
     client.setAction(Action.ZOOM);
@@ -164,8 +164,8 @@ public class ViewportMover {
   }
 
   // Log-uniform, so zooming in and out are equally likely around the default.
-  private static double zoomTarget(boolean zoomsOut, double minCellSize, ThreadLocalRandom rng) {
-    double min = zoomsOut ? minCellSize : 0.8;
+  private static double zoomTarget(boolean zoomsOut, ThreadLocalRandom rng) {
+    double min = zoomsOut ? Camera.MIN_CELL_SIZE : 0.8;
     double max = zoomsOut ? 0.4 : 8;
     return Math.exp(rng.nextDouble(Math.log(min), Math.log(max)));
   }

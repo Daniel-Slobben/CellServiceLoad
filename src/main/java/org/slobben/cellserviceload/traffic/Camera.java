@@ -8,8 +8,8 @@ import org.slobben.cellserviceload.utils.BlockUtils;
 /** The frontend's grid view: offsets in cells, zoom as screen pixels per cell. */
 public class Camera {
   static final double DEFAULT_CELL_SIZE = 2.5;
-  // The frontend's zoom-out limit: as many cells as a 4K screen at 0.083 px per cell, ~300 blocks of 2000.
-  static final double MAX_CELLS_IN_VIEW = (3840 / 0.083) * (2160 / 0.083);
+  // The frontend's zoom-out limit: a block of 2000 cells at 8 px.
+  static final double MIN_CELL_SIZE = 0.004;
   // The backend's sectors, in cells.
   static final int SECTOR_CELLS = 50;
   static final double MAX_CELL_SIZE = 30;
@@ -38,12 +38,7 @@ public class Camera {
     double centerX = cellOffsetX + (this.device.width / cellSize) / 2;
     double centerY = cellOffsetY + (this.device.height / cellSize) / 2;
     this.device = device;
-    cellSize = Math.max(cellSize, minCellSize());
     centerOn(centerX, centerY);
-  }
-
-  public double minCellSize() {
-    return Math.sqrt(device.width * device.height / MAX_CELLS_IN_VIEW);
   }
 
   public void centerOn(double worldX, double worldY) {
@@ -60,7 +55,7 @@ public class Camera {
   /** Zooms keeping the world point under the screen point in place. Out of range zooms are ignored. */
   public void zoomAt(double screenX, double screenY, double zoomFactor) {
     double newCellSize = cellSize * zoomFactor;
-    if (newCellSize < minCellSize() || newCellSize > MAX_CELL_SIZE) {
+    if (newCellSize < MIN_CELL_SIZE || newCellSize > MAX_CELL_SIZE) {
       return;
     }
     double worldX = cellOffsetX + screenX / cellSize;
