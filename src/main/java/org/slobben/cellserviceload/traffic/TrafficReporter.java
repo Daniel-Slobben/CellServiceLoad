@@ -38,7 +38,7 @@ public class TrafficReporter {
     long blocksWatched = 0;
     int maxBlocksWatched = 0;
     for (Client client : clientRegistry.all()) {
-      int watched = client.getBlocksInView().size();
+      int watched = client.blocksInView();
       clients++;
       blocksWatched += watched;
       maxBlocksWatched = Math.max(maxBlocksWatched, watched);
@@ -49,7 +49,7 @@ public class TrafficReporter {
         reconnecting++;
       }
       long lastFrameAtMs = client.getLastFrameAtMs() > 0 ? client.getLastFrameAtMs() : client.getCreatedAtMs();
-      if (now - lastFrameAtMs > thresholdMs) {
+      if (!client.isSectors() && now - lastFrameAtMs > thresholdMs) {
         stuck++;
       }
       if (client.getCamera().cellSize() < ZOOMED_OUT_CELL_SIZE) {

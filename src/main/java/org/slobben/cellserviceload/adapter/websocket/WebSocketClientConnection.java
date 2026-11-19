@@ -68,9 +68,9 @@ public class WebSocketClientConnection {
   }
 
   // Sends on a closed session are dropped; a reconnect resends the whole view anyway.
-  public void sendClientUpdateRequest(String[] blocksToRemove, String[] blocksToAdd, boolean sectors) {
+  public void sendClientUpdateRequest(int[] range, boolean sectors) {
     if (!session.isConnected()) return;
-    session.send("/client-update", new ClientUpdateRequest(blocksToRemove, blocksToAdd, sectors));
+    session.send("/client-update", new ClientUpdateRequest(range[0], range[1], range[2], range[3], sectors, new String[0]));
   }
 
   public void disconnect() {

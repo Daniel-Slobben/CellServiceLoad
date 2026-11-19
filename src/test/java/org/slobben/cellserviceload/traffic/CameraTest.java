@@ -37,27 +37,28 @@ class CameraTest {
   }
 
   @Test
-  void zoomedAllTheWayOutOnDesktopWatchesAboutThreeHundredBlocksAsCells() {
-    Camera camera = zoomedAllTheWayOut(Device.DESKTOP);
-    int[] range = camera.blockRange();
-    int blocks = (range[1] - range[0] + 1) * (range[3] - range[2] + 1);
+  void zoomedAllTheWayOutWatchesSectors() {
+    for (Device device : Device.values()) {
+      Camera camera = zoomedAllTheWayOut(device);
 
-    assertEquals(Camera.blocksIn(range).size(), blocks);
-    assertEquals(true, blocks >= 300 && blocks <= 420, "blocks: " + blocks);
-    assertEquals(true, camera.sectorPixels() > ViewportMover.SECTOR_PIXELS, "sector px: " + camera.sectorPixels());
+      assertEquals(true, camera.sectorPixels() <= ViewportMover.SECTOR_PIXELS, device + " sector px: " + camera.sectorPixels());
+    }
   }
 
   @Test
-  void zoomedAllTheWayOutOnPhoneWatchesSectors() {
-    Camera camera = zoomedAllTheWayOut(Device.PHONE);
+  void aDesktopSwitchesToSectorsAtAbout250BlocksAndAPhoneAt1Px() {
+    Camera desktop = new Camera(Device.DESKTOP, BLOCK_SIZE);
+    Camera phone = new Camera(Device.PHONE, BLOCK_SIZE);
 
-    assertEquals(true, camera.sectorPixels() <= ViewportMover.SECTOR_PIXELS, "sector px: " + camera.sectorPixels());
+    // 1920x1050 px holds 250 blocks of 90 px: 2000 cells at 0.045 px, so sectors of 2.25 px
+    assertEquals(2.25, desktop.sectorSwitchPixels(), 0.01);
+    assertEquals(ViewportMover.SECTOR_PIXELS, phone.sectorSwitchPixels());
   }
 
   private static Camera zoomedAllTheWayOut(Device device) {
     Camera camera = new Camera(device, BLOCK_SIZE);
     camera.centerOn(0, 0);
-    while (camera.cellSize() * 0.95 >= camera.minCellSize()) {
+    while (camera.cellSize() * 0.95 >= Camera.MIN_CELL_SIZE) {
       camera.zoomAt(device.width / 2.0, device.height / 2.0, 0.95);
     }
     return camera;

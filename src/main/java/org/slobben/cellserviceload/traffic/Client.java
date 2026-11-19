@@ -1,7 +1,5 @@
 package org.slobben.cellserviceload.traffic;
 
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
 
 import lombok.Getter;
@@ -17,8 +15,8 @@ public class Client {
   @Setter private volatile boolean zoomsOut;
   private final TrafficStats stats;
   private final ReentrantLock lock = new ReentrantLock();
-  private final Set<String> blocksInView = new HashSet<>();
-  @Setter private int[] viewRange;
+  // minX, maxX, minY, maxY of the blocks in view
+  @Setter private volatile int[] viewRange;
   // Zoomed far out the frontend asks for sectors instead of cells.
   @Setter private volatile boolean sectors;
   private final long createdAtMs = System.currentTimeMillis();
@@ -56,8 +54,11 @@ public class Client {
   public void centerOn(int worldX, int worldY) {
     camera.centerOn(worldX, worldY);
     viewRange = camera.blockRange();
-    blocksInView.clear();
-    blocksInView.addAll(Camera.blocksIn(viewRange));
+  }
+
+  public int blocksInView() {
+    int[] range = viewRange;
+    return (range[1] - range[0] + 1) * (range[3] - range[2] + 1);
   }
 
   /** Closes the client for good, after a reconnect that is going. */
@@ -83,7 +84,7 @@ public class Client {
       public void onBlocks(BlockFrame frame) {
         if (number != connectionNumber) return;
         long now = System.currentTimeMillis();
-        if (lastFrameAtMs > 0) {
+        if (lastFrameAtMs > 0 && !sectors) {
           stats.recordFrameGap(now - lastFrameAtMs);
         }
         lastFrameAtMs = now;

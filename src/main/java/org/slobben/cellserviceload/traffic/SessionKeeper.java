@@ -43,8 +43,7 @@ public class SessionKeeper {
   public void start(Client client, WebSocketClientConnection connection) {
     client.setConnection(connection);
     client.markServerContact();
-    connection.sendClientUpdateRequest(
-        new String[0], client.getBlocksInView().toArray(new String[0]), client.isSectors());
+    connection.sendClientUpdateRequest(client.getViewRange(), client.isSectors());
   }
 
   @Scheduled(fixedDelay = 250)
@@ -53,7 +52,8 @@ public class SessionKeeper {
     long reconnectThresholdMs = trafficStats.getReconnectThresholdMs();
     for (Client client : clientRegistry.all()) {
       boolean closed = !client.getConnection().isConnected();
-      boolean silent = client.getLastServerContactMs() < now - reconnectThresholdMs;
+      // a sector client gets a frame every 10 s, its silence shows as missed heartbeats instead
+      boolean silent = !client.isSectors() && client.getLastServerContactMs() < now - reconnectThresholdMs;
       if (client.isReconnecting() || client.getNextReconnectAtMs() > now || !(closed || silent)) {
         continue;
       }
