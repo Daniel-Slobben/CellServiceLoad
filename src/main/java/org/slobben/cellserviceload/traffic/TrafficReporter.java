@@ -38,7 +38,7 @@ public class TrafficReporter {
     long blocksWatched = 0;
     int maxBlocksWatched = 0;
     for (Client client : clientRegistry.all()) {
-      int watched = client.getBlocksInView().size();
+      int watched = client.blocksInView();
       clients++;
       blocksWatched += watched;
       maxBlocksWatched = Math.max(maxBlocksWatched, watched);

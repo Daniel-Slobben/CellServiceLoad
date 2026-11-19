@@ -1,10 +1,5 @@
 package org.slobben.cellserviceload.traffic;
 
-import java.util.HashSet;
-import java.util.Set;
-
-import org.slobben.cellserviceload.utils.BlockUtils;
-
 /** The frontend's grid view: offsets in cells, zoom as screen pixels per cell. */
 public class Camera {
   static final double DEFAULT_CELL_SIZE = 2.5;
@@ -90,15 +85,5 @@ public class Camera {
   public double sectorSwitchPixels() {
     double budgetPixels = Math.sqrt((double) device.width * device.height / MAX_CELL_BLOCKS) * SECTOR_CELLS / blockSize;
     return Math.max(ViewportMover.SECTOR_PIXELS, budgetPixels);
-  }
-
-  public static Set<String> blocksIn(int[] range) {
-    Set<String> blocks = new HashSet<>();
-    for (int x = range[0]; x <= range[1]; x++) {
-      for (int y = range[2]; y <= range[3]; y++) {
-        blocks.add(BlockUtils.getKey(x, y));
-      }
-    }
-    return blocks;
   }
 }

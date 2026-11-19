@@ -1,8 +1,6 @@
 package org.slobben.cellserviceload.traffic;
 
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -182,26 +180,8 @@ public class ViewportMover {
     if (Arrays.equals(range, client.getViewRange()) && sectors == client.isSectors()) {
       return;
     }
-    boolean switched = sectors != client.isSectors();
     client.setViewRange(range);
     client.setSectors(sectors);
-    // Watching sectors, the frontend asks for no blocks: the sectors of all of them come anyway.
-    Set<String> oldBlocks = client.getBlocksInView();
-    Set<String> newBlocks = sectors ? Set.of() : Camera.blocksIn(range);
-    String[] toRemove = diff(oldBlocks, newBlocks);
-    String[] toAdd = diff(newBlocks, oldBlocks);
-    if (!switched && toRemove.length == 0 && toAdd.length == 0) {
-      return;
-    }
-
-    client.getConnection().sendClientUpdateRequest(toRemove, toAdd, sectors);
-    oldBlocks.clear();
-    oldBlocks.addAll(newBlocks);
-  }
-
-  private static String[] diff(Set<String> a, Set<String> b) {
-    Set<String> result = new HashSet<>(a);
-    result.removeAll(b);
-    return result.toArray(new String[0]);
+    client.getConnection().sendClientUpdateRequest(range, sectors);
   }
 }
