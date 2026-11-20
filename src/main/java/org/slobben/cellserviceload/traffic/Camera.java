@@ -8,7 +8,7 @@ public class Camera {
   // The backend's sectors, in cells.
   static final int SECTOR_CELLS = 50;
   // A big screen watches sectors once its view holds this many blocks, like the frontend.
-  static final int MAX_CELL_BLOCKS = 250;
+  static final int MAX_CELL_BLOCKS = 350;
   static final double MAX_CELL_SIZE = 30;
 
   private Device device;
@@ -81,7 +81,7 @@ public class Camera {
     return cellSize * SECTOR_CELLS;
   }
 
-  /** At or below this sectorPixels the frontend watches sectors: 1 px, or earlier once the view holds 250 blocks. */
+  /** At or below this sectorPixels the frontend watches sectors: 1 px, or earlier once the view holds 350 blocks. */
   public double sectorSwitchPixels() {
     double budgetPixels = Math.sqrt((double) device.width * device.height / MAX_CELL_BLOCKS) * SECTOR_CELLS / blockSize;
     return Math.max(ViewportMover.SECTOR_PIXELS, budgetPixels);
